@@ -8,8 +8,10 @@ use constants::{
     button_color_pair, clear_resp_btn_x, gemini_api_key, init_ui_colors, load_env_files,
     text_input_color_pair, ALLOW_MOUSE_INPUT, AI_INPUT_HEIGHT, AI_INPUT_WIDTH,
     AI_MISSING_API_KEY_RES_TEXT,
-    AI_NO_PROMPT_RES_TEXT, BTN_HEIGHT, BTN_WIDTH, CLEAR_RESP_BTN_HEIGHT, CLEAR_RESP_BTN_LABEL,
-    CLEAR_RESP_BTN_WIDTH, COL_BTN, COL_FLASH_TEXT, COL_TITLE, PAIR_AI_RESPONSE, ROW_FIRST_BTN,
+    AI_NO_PROMPT_RES_TEXT, AI_RES_WAITING_TEXT, BTN_HEIGHT, BTN_WIDTH, CLEAR_RESP_BTN_HEIGHT,
+    CLEAR_RESP_BTN_LABEL,
+    CLEAR_RESP_BTN_WIDTH, COL_BTN, COL_FLASH_TEXT, COL_TITLE, PAIR_AI_RESPONSE,
+    PAIR_TEXT_INPUT_LOCKED_NON_HOVERED, ROW_FIRST_BTN,
     ROW_TITLE, TEST_AI_BTN_HEIGHT, TEST_AI_BTN_LABEL, TEST_AI_BTN_WIDTH,
 };
 use pancurses::{echo, endwin, initscr, noecho, Input};
@@ -220,6 +222,11 @@ impl App {
         }
     }
 
+    /// Streaming started but no model output yet (waiting text replaces prompt).
+    fn ai_waiting_for_first_token(&self) -> bool {
+        self.ai_streaming && self.ai_response.is_empty()
+    }
+
     fn layout(&self) -> Layout {
         let rows = wrapped_line_count(&self.ai_response, text_wrap_width());
         compute_layout(
@@ -427,6 +434,13 @@ fn draw_ai_response(win: &pancurses::Window, y: i32, text: &str) {
     win.attroff(COLOR_PAIR(PAIR_AI_RESPONSE));
 }
 
+fn draw_ai_waiting(win: &pancurses::Window, y: i32, text: &str) {
+    win.attron(COLOR_PAIR(PAIR_TEXT_INPUT_LOCKED_NON_HOVERED));
+    win.mv(y, COL_BTN);
+    win.addstr(text);
+    win.attroff(COLOR_PAIR(PAIR_TEXT_INPUT_LOCKED_NON_HOVERED));
+}
+
 fn draw_ui(win: &pancurses::Window, app: &App) {
     let layout = app.layout();
 
@@ -477,7 +491,9 @@ fn draw_ui(win: &pancurses::Window, app: &App) {
         );
     }
 
-    if !app.ai_response.is_empty() {
+    if app.ai_waiting_for_first_token() {
+        draw_ai_waiting(win, layout.ai_response_y, AI_RES_WAITING_TEXT);
+    } else if !app.ai_response.is_empty() {
         draw_ai_response(win, layout.ai_response_y, &app.ai_response);
     }
 

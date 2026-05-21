@@ -88,6 +88,9 @@ pub const AI_RES_TEXT_BG: i16 = -1;
 /// Shown as AI response text when **Test AI** is used with an empty prompt.
 pub const AI_NO_PROMPT_RES_TEXT: &str = "Please enter a prompt";
 
+/// Shown below **Test AI** (yellow) while waiting for the first model token.
+pub const AI_RES_WAITING_TEXT: &str = "Waiting for response...";
+
 // --- Color pairs ---
 
 pub const PAIR_BTN_NORMAL: u64 = 1;
