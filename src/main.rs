@@ -6,7 +6,8 @@ mod constants;
 use backend::{start_stream, AiStreamEvent};
 use constants::{
     button_color_pair, clear_resp_btn_x, gemini_api_key, init_ui_colors, load_env_files,
-    text_input_color_pair, AI_INPUT_HEIGHT, AI_INPUT_WIDTH, AI_MISSING_API_KEY_RES_TEXT,
+    text_input_color_pair, ALLOW_MOUSE_INPUT, AI_INPUT_HEIGHT, AI_INPUT_WIDTH,
+    AI_MISSING_API_KEY_RES_TEXT,
     AI_NO_PROMPT_RES_TEXT, BTN_HEIGHT, BTN_WIDTH, CLEAR_RESP_BTN_HEIGHT, CLEAR_RESP_BTN_LABEL,
     CLEAR_RESP_BTN_WIDTH, COL_BTN, COL_FLASH_TEXT, COL_TITLE, PAIR_AI_RESPONSE, ROW_FIRST_BTN,
     ROW_TITLE, TEST_AI_BTN_HEIGHT, TEST_AI_BTN_LABEL, TEST_AI_BTN_WIDTH,
@@ -540,7 +541,9 @@ fn main() {
     win.keypad(true);
     win.timeout(POLL_MS);
 
-    let _ = pancurses::mousemask(pancurses::BUTTON1_CLICKED, None);
+    if ALLOW_MOUSE_INPUT {
+        let _ = pancurses::mousemask(pancurses::BUTTON1_CLICKED, None);
+    }
     init_ui_colors();
 
     let mut app = App::new();
@@ -567,7 +570,7 @@ fn main() {
             Some(Input::KeyDown) | Some(Input::KeyRight) => {
                 app.focus = app.focus.next(app.show_clear_response);
             }
-            Some(Input::KeyMouse) => {
+            Some(Input::KeyMouse) if ALLOW_MOUSE_INPUT => {
                 if let Ok(evt) = pancurses::getmouse() {
                     if evt.bstate & pancurses::BUTTON1_CLICKED != 0 {
                         let layout = app.layout();

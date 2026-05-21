@@ -5,6 +5,7 @@
  - TUI interface
     - All user interface related features will be accessible through a lightweight curses interface
     - Can hook into already running background daemon or, if one doesn't already exist, initialize a new background daemon
+    - Can support mouse input
  - Specialized agent creation
     - Define:
        - Roles/Specialization
