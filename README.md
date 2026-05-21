@@ -1,0 +1,53 @@
+# Purpose
+ - Rust based MCP multi agent orchestration customizer TUI thing idk
+
+# Intended Features
+ - TUI interface
+    - All user interface related features will be accessible through a lightweight curses interface
+    - Can hook into already running background daemon or, if one doesn't already exist, initialize a new background daemon
+ - Specialized agent creation
+    - Define:
+       - Roles/Specialization
+       - System prompts
+       - Guardrails:
+          - What are they allowed to read and/or write to
+          - What URL domains are they allowed to access
+          - What local tools do they have access to
+          - Enforce at both deterministic software level and prompt level
+       - Retry policy
+       - Task limits:
+           - Token usage
+           - Duration
+ - Specialized agent tracking:
+    - See what each agent is doing
+    - Stop agents
+    - Revert agents' changes
+ - Orchestrator agent:
+    - Task delegation to specialized agents
+    - Summarize current state of agents
+    - Automatically stop agents that are violating certain guardrails
+ - Agent workflow logging:
+    - Define descriptive and hardcoded tags for identifying agent actions
+    - Categorize each action that an agent performs with tags
+    - Human readable log of all actions that agents have done
+       - Significant decisions are emphasized over minor command runs and actions
+       - Option to highglight specific action types:
+          - Web requests
+          - NPM commands
+          - Running custom scripts
+          - Writing to specific files
+ - Workflow hooks:
+    - Define custom actions that will be run when certain actions occur:
+       - Touching a specific file
+       - Making a web request to a specific URL
+       - Running a specific command
+ - Agent centered VC:
+    - Agents take advantage of VC systems to log the diffs of their file system related actions to efficiently revert changes if needed
+ - Background persistence:
+    - Option to leave it on as a persistent background daemon process on exit
+    - Configurable to automatically start as a persistent background daemon process
+
+# Constraints
+ - All agent actions must be revertable
+ - All agent tasks must be interruptable
+ - All agent tasks must be recoverable in case of a crash or outage
