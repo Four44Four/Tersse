@@ -5,12 +5,11 @@ mod constants;
 
 use backend::{start_stream, AiStreamEvent};
 use constants::{
-    button_color_pair, clear_resp_btn_x, init_ui_colors, AI_INPUT_HEIGHT, AI_INPUT_WIDTH,
-    BTN_HEIGHT, BTN_WIDTH, CLEAR_RESP_BTN_HEIGHT, CLEAR_RESP_BTN_LABEL, CLEAR_RESP_BTN_WIDTH,
-    gemini_api_key, load_env_files, AI_MISSING_API_KEY_RES_TEXT, AI_NO_PROMPT_RES_TEXT, COL_BTN,
-    COL_FLASH_TEXT,
-    COL_TITLE, PAIR_AI_INPUT, PAIR_AI_RESPONSE,
-    ROW_FIRST_BTN, ROW_TITLE, TEST_AI_BTN_HEIGHT, TEST_AI_BTN_LABEL, TEST_AI_BTN_WIDTH,
+    button_color_pair, clear_resp_btn_x, gemini_api_key, init_ui_colors, load_env_files,
+    text_input_color_pair, AI_INPUT_HEIGHT, AI_INPUT_WIDTH, AI_MISSING_API_KEY_RES_TEXT,
+    AI_NO_PROMPT_RES_TEXT, BTN_HEIGHT, BTN_WIDTH, CLEAR_RESP_BTN_HEIGHT, CLEAR_RESP_BTN_LABEL,
+    CLEAR_RESP_BTN_WIDTH, COL_BTN, COL_FLASH_TEXT, COL_TITLE, PAIR_AI_RESPONSE, ROW_FIRST_BTN,
+    ROW_TITLE, TEST_AI_BTN_HEIGHT, TEST_AI_BTN_LABEL, TEST_AI_BTN_WIDTH,
 };
 use pancurses::{echo, endwin, initscr, noecho, Input};
 use pancurses::{curs_set, COLOR_PAIR};
@@ -410,20 +409,12 @@ fn draw_demo_button(win: &pancurses::Window, y: i32, button: DemoButton, focused
 
 fn draw_ai_input(win: &pancurses::Window, y: i32, text: &str, locked: bool, focused: bool) {
     let display: String = text.chars().take(AI_INPUT_WIDTH as usize).collect();
+    let pair = text_input_color_pair(focused, locked);
+    fill_solid(win, y, COL_BTN, AI_INPUT_WIDTH, AI_INPUT_HEIGHT, pair);
+    win.attron(COLOR_PAIR(pair));
     win.mv(y, COL_BTN);
-    for _ in 0..AI_INPUT_WIDTH {
-        win.addch(' ');
-    }
-    win.mv(y, COL_BTN);
-    if locked {
-        win.attron(COLOR_PAIR(PAIR_AI_INPUT));
-        win.addstr(&display);
-        win.attroff(COLOR_PAIR(PAIR_AI_INPUT));
-    } else if focused {
-        win.addstr(&display);
-    } else {
-        win.addstr(&display);
-    }
+    win.addstr(&display);
+    win.attroff(COLOR_PAIR(pair));
 }
 
 fn draw_ai_response(win: &pancurses::Window, y: i32, text: &str) {

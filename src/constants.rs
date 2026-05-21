@@ -1,8 +1,6 @@
 //! UI layout, size, color, and API constants.
 
-use pancurses::{
-    can_change_color, has_colors, init_color, init_pair, start_color, use_default_colors, COLORS,
-};
+use pancurses::{has_colors, init_pair, start_color, use_default_colors};
 
 // --- API (Gemini-compatible REST) ---
 
@@ -64,13 +62,21 @@ pub const CLEAR_RESP_BTN_HEIGHT: i32 = 1;
 pub const CLEAR_RESP_BTN_LABEL: &str = "Clear Response";
 pub const CLEAR_RESP_BTN_GAP: i32 = 1;
 
-// --- Text colors (pair foreground / background) ---
+// --- Text input colors (editing, unlocked) ---
 
-/// Locked AI prompt text: custom `#999999`.
-pub const AI_INPUT_TEXT_HEX: &str = "#999999";
-/// Curses palette index where `#999999` is registered via `init_color`.
-pub const AI_INPUT_TEXT_COLOR: i16 = 16;
-pub const AI_INPUT_TEXT_BG: i16 = -1;
+pub const TEXT_INPUT_NON_HOVERED_COLOR_FG: i16 = pancurses::COLOR_WHITE;
+pub const TEXT_INPUT_NON_HOVERED_COLOR_BG: i16 = -1;
+
+pub const TEXT_INPUT_HOVERED_COLOR_FG: i16 = pancurses::COLOR_BLACK;
+pub const TEXT_INPUT_HOVERED_COLOR_BG: i16 = pancurses::COLOR_WHITE;
+
+// --- Text input colors (locked / submitted prompt) ---
+
+pub const TEXT_INPUT_LOCKED_NON_HOVERED_COLOR_FG: i16 = pancurses::COLOR_YELLOW;
+pub const TEXT_INPUT_LOCKED_NON_HOVERED_COLOR_BG: i16 = -1;
+
+pub const TEXT_INPUT_LOCKED_HOVERED_COLOR_FG: i16 = pancurses::COLOR_RED;
+pub const TEXT_INPUT_LOCKED_HOVERED_COLOR_BG: i16 = pancurses::COLOR_WHITE;
 
 pub const AI_RES_TEXT_COLOR: i16 = pancurses::COLOR_WHITE;
 pub const AI_RES_TEXT_BG: i16 = -1;
@@ -82,47 +88,29 @@ pub const AI_NO_PROMPT_RES_TEXT: &str = "Please enter a prompt";
 
 pub const PAIR_BTN_NORMAL: u64 = 1;
 pub const PAIR_BTN_FOCUSED: u64 = 2;
-pub const PAIR_AI_INPUT: u64 = 3;
+pub const PAIR_TEXT_INPUT_NON_HOVERED: u64 = 3;
 pub const PAIR_AI_RESPONSE: u64 = 4;
+pub const PAIR_TEXT_INPUT_HOVERED: u64 = 5;
+pub const PAIR_TEXT_INPUT_LOCKED_NON_HOVERED: u64 = 6;
+pub const PAIR_TEXT_INPUT_LOCKED_FOCUSED: u64 = 7;
 
 pub const BTN_NORMAL_FG: i16 = pancurses::COLOR_WHITE;
 pub const BTN_NORMAL_BG: i16 = pancurses::COLOR_BLUE;
 pub const BTN_FOCUSED_FG: i16 = pancurses::COLOR_BLACK;
 pub const BTN_FOCUSED_BG: i16 = pancurses::COLOR_CYAN;
 
-/// Convert an 8-bit channel (0–255) to curses `init_color` scale (0–1000).
-const fn channel_1000(c: u8) -> i16 {
-    ((c as i32) * 1000 / 255) as i16
-}
-
-/// Parse `#RRGGBB` into `(r, g, b)` bytes.
-fn hex_rgb(hex: &str) -> (u8, u8, u8) {
-    let h = hex.trim_start_matches('#');
-    let r = u8::from_str_radix(&h[0..2], 16).unwrap_or(0);
-    let g = u8::from_str_radix(&h[2..4], 16).unwrap_or(0);
-    let b = u8::from_str_radix(&h[4..6], 16).unwrap_or(0);
-    (r, g, b)
-}
-
-/// Register `#999999` in the curses palette; returns the foreground index for `init_pair`.
-fn register_ai_input_text_color() -> i16 {
-    let (r, g, b) = hex_rgb(AI_INPUT_TEXT_HEX);
-    let index = if (COLORS() as i16) > AI_INPUT_TEXT_COLOR {
-        AI_INPUT_TEXT_COLOR
+/// Color pair for the text input in the given focus / lock state.
+pub fn text_input_color_pair(focused: bool, locked: bool) -> u64 {
+    if locked {
+        if focused {
+            PAIR_TEXT_INPUT_LOCKED_FOCUSED
+        } else {
+            PAIR_TEXT_INPUT_LOCKED_NON_HOVERED
+        }
+    } else if focused {
+        PAIR_TEXT_INPUT_HOVERED
     } else {
-        pancurses::COLOR_YELLOW
-    };
-
-    if can_change_color() && index == AI_INPUT_TEXT_COLOR {
-        init_color(
-            index,
-            channel_1000(r),
-            channel_1000(g),
-            channel_1000(b),
-        );
-        index
-    } else {
-        pancurses::COLOR_YELLOW
+        PAIR_TEXT_INPUT_NON_HOVERED
     }
 }
 
@@ -134,8 +122,26 @@ pub fn init_ui_colors() {
         init_pair(PAIR_BTN_NORMAL as i16, BTN_NORMAL_FG, BTN_NORMAL_BG);
         init_pair(PAIR_BTN_FOCUSED as i16, BTN_FOCUSED_FG, BTN_FOCUSED_BG);
 
-        let ai_input_fg = register_ai_input_text_color();
-        init_pair(PAIR_AI_INPUT as i16, ai_input_fg, AI_INPUT_TEXT_BG);
+        init_pair(
+            PAIR_TEXT_INPUT_NON_HOVERED as i16,
+            TEXT_INPUT_NON_HOVERED_COLOR_FG,
+            TEXT_INPUT_NON_HOVERED_COLOR_BG,
+        );
+        init_pair(
+            PAIR_TEXT_INPUT_HOVERED as i16,
+            TEXT_INPUT_HOVERED_COLOR_FG,
+            TEXT_INPUT_HOVERED_COLOR_BG,
+        );
+        init_pair(
+            PAIR_TEXT_INPUT_LOCKED_NON_HOVERED as i16,
+            TEXT_INPUT_LOCKED_NON_HOVERED_COLOR_FG,
+            TEXT_INPUT_LOCKED_NON_HOVERED_COLOR_BG,
+        );
+        init_pair(
+            PAIR_TEXT_INPUT_LOCKED_FOCUSED as i16,
+            TEXT_INPUT_LOCKED_HOVERED_COLOR_FG,
+            TEXT_INPUT_LOCKED_HOVERED_COLOR_BG,
+        );
 
         init_pair(
             PAIR_AI_RESPONSE as i16,
