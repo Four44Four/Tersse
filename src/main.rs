@@ -30,6 +30,13 @@ impl Button {
         }
     }
 
+    fn flash_text(self) -> &'static str {
+        match self {
+            Button::Foo => "Button 1",
+            Button::Bar => "Button 2",
+        }
+    }
+
     fn index(self) -> usize {
         match self {
             Button::Foo => 0,
@@ -45,33 +52,39 @@ impl Button {
 struct Layout {
     foo_y: i32,
     bar_y: i32,
-    flash_y: Option<i32>,
+    foo_flash_y: Option<i32>,
+    bar_flash_y: Option<i32>,
 }
 
-/// Stack buttons with no gap; insert a flash row under the active button.
-fn compute_layout(flash: Option<Button>) -> Layout {
+/// Stack buttons with no gap; each active flash inserts a row under its button.
+fn compute_layout(foo_flash: bool, bar_flash: bool) -> Layout {
     let mut y = ROW_FIRST_BTN;
 
     let foo_y = y;
     y += BTN_H;
 
-    if flash == Some(Button::Foo) {
-        let flash_y = y;
+    let foo_flash_y = if foo_flash {
+        let row = y;
         y += BTN_H;
-        return Layout {
-            foo_y,
-            bar_y: y,
-            flash_y: Some(flash_y),
-        };
-    }
+        Some(row)
+    } else {
+        None
+    };
 
     let bar_y = y;
     y += BTN_H;
 
+    let bar_flash_y = if bar_flash {
+        Some(y)
+    } else {
+        None
+    };
+
     Layout {
         foo_y,
         bar_y,
-        flash_y: flash.filter(|&b| b == Button::Bar).map(|_| y),
+        foo_flash_y,
+        bar_flash_y,
     }
 }
 
@@ -92,7 +105,8 @@ impl Layout {
 
 struct App {
     focus: Button,
-    flash: Option<(Button, Instant)>,
+    foo_flash: Option<Instant>,
+    bar_flash: Option<Instant>,
     quit: bool,
 }
 
@@ -100,25 +114,35 @@ impl App {
     fn new() -> Self {
         Self {
             focus: Button::Foo,
-            flash: None,
+            foo_flash: None,
+            bar_flash: None,
             quit: false,
         }
     }
 
     fn activate(&mut self, button: Button) {
-        self.flash = Some((button, Instant::now()));
-    }
-
-    fn tick(&mut self) {
-        if let Some((_, at)) = self.flash {
-            if at.elapsed() >= FLASH_SECS {
-                self.flash = None;
-            }
+        let now = Instant::now();
+        match button {
+            Button::Foo => self.foo_flash = Some(now),
+            Button::Bar => self.bar_flash = Some(now),
         }
     }
 
-    fn flash_button(&self) -> Option<Button> {
-        self.flash.map(|(b, _)| b)
+    fn tick(&mut self) {
+        tick_flash(&mut self.foo_flash);
+        tick_flash(&mut self.bar_flash);
+    }
+
+    fn layout(&self) -> Layout {
+        compute_layout(self.foo_flash.is_some(), self.bar_flash.is_some())
+    }
+}
+
+fn tick_flash(slot: &mut Option<Instant>) {
+    if let Some(at) = *slot {
+        if at.elapsed() >= FLASH_SECS {
+            *slot = None;
+        }
     }
 }
 
@@ -143,7 +167,7 @@ fn draw_button(win: &pancurses::Window, y: i32, button: Button, focused: bool) {
 }
 
 fn draw_ui(win: &pancurses::Window, app: &App) {
-    let layout = compute_layout(app.flash_button());
+    let layout = app.layout();
 
     win.erase();
 
@@ -153,9 +177,13 @@ fn draw_ui(win: &pancurses::Window, app: &App) {
     draw_button(win, layout.foo_y, Button::Foo, app.focus == Button::Foo);
     draw_button(win, layout.bar_y, Button::Bar, app.focus == Button::Bar);
 
-    if let (Some(btn), Some(flash_y)) = (app.flash_button(), layout.flash_y) {
-        win.mv(flash_y, BTN_X);
-        win.addstr(btn.label());
+    if let Some(y) = layout.foo_flash_y {
+        win.mv(y, BTN_X);
+        win.addstr(Button::Foo.flash_text());
+    }
+    if let Some(y) = layout.bar_flash_y {
+        win.mv(y, BTN_X);
+        win.addstr(Button::Bar.flash_text());
     }
 
     win.refresh();
@@ -198,7 +226,7 @@ fn main() {
             }
             Some(Input::KeyMouse) => {
                 if let Ok(evt) = pancurses::getmouse() {
-                    let layout = compute_layout(app.flash_button());
+                    let layout = app.layout();
                     if let Some(btn) = layout.hit_button(evt.y, evt.x) {
                         app.focus = btn;
                         app.activate(btn);
