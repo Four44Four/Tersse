@@ -196,6 +196,7 @@ struct App {
     foo_flash: Option<Instant>,
     bar_flash: Option<Instant>,
     ai_input: String,
+    ai_input_cursor: usize,
     ai_input_locked: bool,
     ai_response: String,
     ai_streaming: bool,
@@ -212,6 +213,7 @@ impl App {
             foo_flash: None,
             bar_flash: None,
             ai_input: String::new(),
+            ai_input_cursor: 0,
             ai_input_locked: false,
             ai_response: String::new(),
             ai_streaming: false,
@@ -498,7 +500,7 @@ fn draw_ui(win: &pancurses::Window, app: &App) {
     }
 
     if app.focus == Focus::AiInput && !app.ai_input_locked {
-        let cursor_x = COL_BTN + app.ai_input.chars().count() as i32;
+        let cursor_x = COL_BTN + app.ai_input_cursor as i32;
         curs_set(1);
         win.mv(layout.ai_input_y, cursor_x.min(COL_BTN + AI_INPUT_WIDTH - 1));
     } else {
@@ -508,23 +510,104 @@ fn draw_ui(win: &pancurses::Window, app: &App) {
     win.refresh();
 }
 
+fn ai_input_char_len(app: &App) -> usize {
+    app.ai_input.chars().count()
+}
+
+fn byte_index_for_char(s: &str, char_index: usize) -> usize {
+    s.char_indices()
+        .nth(char_index)
+        .map(|(i, _)| i)
+        .unwrap_or(s.len())
+}
+
+fn insert_char_at(s: &mut String, char_index: usize, c: char) {
+    let byte_index = byte_index_for_char(s, char_index);
+    s.insert(byte_index, c);
+}
+
+fn remove_char_before(s: &mut String, char_index: usize) -> bool {
+    if char_index == 0 {
+        return false;
+    }
+    let byte_index = byte_index_for_char(s, char_index - 1);
+    let ch_len = s[byte_index..].chars().next().unwrap().len_utf8();
+    s.drain(byte_index..byte_index + ch_len);
+    true
+}
+
+fn remove_char_at(s: &mut String, char_index: usize) -> bool {
+    if char_index >= s.chars().count() {
+        return false;
+    }
+    let byte_index = byte_index_for_char(s, char_index);
+    let ch_len = s[byte_index..].chars().next().unwrap().len_utf8();
+    s.drain(byte_index..byte_index + ch_len);
+    true
+}
+
+fn ai_input_editing(app: &App) -> bool {
+    app.focus == Focus::AiInput && !app.ai_input_locked
+}
+
 fn handle_input_char(app: &mut App, c: char) {
-    if app.focus != Focus::AiInput || app.ai_input_locked {
+    if !ai_input_editing(app) {
         return;
     }
     if c.is_control() {
         return;
     }
-    if app.ai_input.chars().count() < AI_INPUT_WIDTH as usize {
-        app.ai_input.push(c);
+    if ai_input_char_len(app) >= AI_INPUT_WIDTH as usize {
+        return;
     }
+    insert_char_at(&mut app.ai_input, app.ai_input_cursor, c);
+    app.ai_input_cursor += 1;
 }
 
 fn handle_backspace(app: &mut App) {
-    if app.focus != Focus::AiInput || app.ai_input_locked {
+    if !ai_input_editing(app) {
         return;
     }
-    app.ai_input.pop();
+    if remove_char_before(&mut app.ai_input, app.ai_input_cursor) {
+        app.ai_input_cursor -= 1;
+    }
+}
+
+fn handle_delete(app: &mut App) {
+    if !ai_input_editing(app) {
+        return;
+    }
+    remove_char_at(&mut app.ai_input, app.ai_input_cursor);
+}
+
+fn handle_cursor_left(app: &mut App) {
+    if !ai_input_editing(app) {
+        return;
+    }
+    if app.ai_input_cursor > 0 {
+        app.ai_input_cursor -= 1;
+    }
+}
+
+fn handle_cursor_right(app: &mut App) {
+    if !ai_input_editing(app) {
+        return;
+    }
+    let len = ai_input_char_len(app);
+    if app.ai_input_cursor < len {
+        app.ai_input_cursor += 1;
+    }
+}
+
+fn handle_tab_in_input(app: &mut App) {
+    if !ai_input_editing(app) {
+        return;
+    }
+    if ai_input_char_len(app) >= AI_INPUT_WIDTH as usize {
+        return;
+    }
+    insert_char_at(&mut app.ai_input, app.ai_input_cursor, '\t');
+    app.ai_input_cursor += 1;
 }
 
 fn apply_mouse_focus(app: &mut App, layout: Layout, row: i32, col: i32) {
@@ -570,7 +653,11 @@ fn main() {
 
         match win.getch() {
             Some(Input::Character('\t')) => {
-                app.focus = app.focus.next(app.show_clear_response);
+                if ai_input_editing(&app) {
+                    handle_tab_in_input(&mut app);
+                } else {
+                    app.focus = app.focus.next(app.show_clear_response);
+                }
             }
             Some(Input::Character(c)) if matches!(c, 'q' | 'Q') && app.focus != Focus::AiInput => {
                 app.quit = true;
@@ -588,10 +675,25 @@ fn main() {
             Some(Input::Character(c)) if c == '\x08' || c == '\x7f' => handle_backspace(&mut app),
             Some(Input::Character(c)) => handle_input_char(&mut app, c),
             Some(Input::KeyBackspace) => handle_backspace(&mut app),
-            Some(Input::KeyUp) | Some(Input::KeyLeft) => {
+            Some(Input::KeyDC) => handle_delete(&mut app),
+            Some(Input::KeyLeft) => {
+                if ai_input_editing(&app) {
+                    handle_cursor_left(&mut app);
+                } else {
+                    app.focus = app.focus.prev(app.show_clear_response);
+                }
+            }
+            Some(Input::KeyRight) => {
+                if ai_input_editing(&app) {
+                    handle_cursor_right(&mut app);
+                } else {
+                    app.focus = app.focus.next(app.show_clear_response);
+                }
+            }
+            Some(Input::KeyUp) => {
                 app.focus = app.focus.prev(app.show_clear_response);
             }
-            Some(Input::KeyDown) | Some(Input::KeyRight) => {
+            Some(Input::KeyDown) => {
                 app.focus = app.focus.next(app.show_clear_response);
             }
             Some(Input::KeyMouse) if ALLOW_MOUSE_INPUT => {
