@@ -325,7 +325,7 @@ impl App {
             Focus::Bar => self.activate_demo(DemoButton::Bar),
             Focus::TestAi => self.start_ai_request(),
             Focus::ClearResponse => self.clear_ai_response(),
-            Focus::AiInput => self.start_ai_request(),
+            Focus::AiInput => {}
         }
     }
 
@@ -576,7 +576,15 @@ fn main() {
                 app.quit = true;
             }
             Some(Input::Character('\x1b')) => app.quit = true,
-            Some(Input::Character(c)) if matches!(c, '\n' | '\r' | ' ') => app.activate_focused(),
+            Some(Input::Character(c)) if matches!(c, '\n' | '\r' | ' ') => {
+                if app.focus == Focus::AiInput && !app.ai_input_locked {
+                    if c == ' ' {
+                        handle_input_char(&mut app, ' ');
+                    }
+                } else {
+                    app.activate_focused();
+                }
+            }
             Some(Input::Character(c)) if c == '\x08' || c == '\x7f' => handle_backspace(&mut app),
             Some(Input::Character(c)) => handle_input_char(&mut app, c),
             Some(Input::KeyBackspace) => handle_backspace(&mut app),
