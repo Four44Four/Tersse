@@ -1,0 +1,20 @@
+[package]
+name = "agents_4_agents"
+version = "0.1.0"
+edition = "2021"
+description = "Cross-platform curses TUI demo (Hello world + Foo/Bar buttons)"
+license = "MIT OR Apache-2.0"
+build = "build.rs"
+
+[dependencies]
+
+[target.'cfg(windows)'.dependencies]
+# win32 = existing console; default win32a opens a separate GDI window
+pancurses = { version = "0.17", features = ["win32"] }
+
+[target.'cfg(not(windows))'.dependencies]
+pancurses = "0.17"
+
+[profile.release]
+lto = true
+strip = true
