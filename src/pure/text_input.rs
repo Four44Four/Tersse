@@ -45,9 +45,9 @@ fn remove_char_at(s: &mut String, char_index: usize) -> bool {
     true
 }
 
-/// Insert a printable character at the cursor. Returns `None` for control chars or at max length.
-pub fn insert_char(state: &TextInputState, max_width: usize, c: char) -> Option<TextInputState> {
-    if c.is_control() || state.char_len() >= max_width {
+/// Insert a printable character at the cursor. Returns `None` for control characters.
+pub fn insert_char(state: &TextInputState, c: char) -> Option<TextInputState> {
+    if c.is_control() {
         return None;
     }
     let mut text = state.text.clone();
@@ -105,6 +105,6 @@ pub fn cursor_right(state: &TextInputState) -> Option<TextInputState> {
 }
 
 /// Insert a literal tab at the cursor.
-pub fn insert_tab(state: &TextInputState, max_width: usize) -> Option<TextInputState> {
-    insert_char(state, max_width, '\t')
+pub fn insert_tab(state: &TextInputState) -> Option<TextInputState> {
+    insert_char(state, '\t')
 }

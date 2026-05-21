@@ -18,6 +18,7 @@ use constants::{
 use pancurses::{echo, endwin, initscr, noecho, Input};
 use pancurses::{curs_set, COLOR_PAIR};
 use pure::text_input::{self, TextInputState};
+use pure::text_wrap;
 use std::sync::mpsc::Receiver;
 use std::time::{Duration, Instant};
 
@@ -111,12 +112,18 @@ struct Layout {
     foo_flash_y: Option<i32>,
     bar_flash_y: Option<i32>,
     ai_input_y: i32,
+    ai_input_height: i32,
     test_ai_y: i32,
     ai_response_y: i32,
     _ai_response_rows: i32,
 }
 
-fn compute_layout(foo_flash: bool, bar_flash: bool, ai_response_rows: i32) -> Layout {
+fn compute_layout(
+    foo_flash: bool,
+    bar_flash: bool,
+    ai_input_rows: i32,
+    ai_response_rows: i32,
+) -> Layout {
     let mut y = ROW_FIRST_BTN;
 
     let foo_y = y;
@@ -142,7 +149,8 @@ fn compute_layout(foo_flash: bool, bar_flash: bool, ai_response_rows: i32) -> La
     };
 
     let ai_input_y = y;
-    y += AI_INPUT_HEIGHT;
+    let ai_input_height = ai_input_rows;
+    y += ai_input_height;
 
     let test_ai_y = y;
     y += TEST_AI_BTN_HEIGHT;
@@ -155,6 +163,7 @@ fn compute_layout(foo_flash: bool, bar_flash: bool, ai_response_rows: i32) -> La
         foo_flash_y,
         bar_flash_y,
         ai_input_y,
+        ai_input_height,
         test_ai_y,
         ai_response_y,
         _ai_response_rows: ai_response_rows,
@@ -176,7 +185,10 @@ impl Layout {
     }
 
     fn hit_ai_input(self, row: i32, col: i32) -> bool {
-        row == self.ai_input_y && col >= COL_BTN && col < COL_BTN + AI_INPUT_WIDTH
+        row >= self.ai_input_y
+            && row < self.ai_input_y + self.ai_input_height
+            && col >= COL_BTN
+            && col < COL_BTN + AI_INPUT_WIDTH
     }
 
     fn hit_test_ai(self, row: i32, col: i32) -> bool {
@@ -232,11 +244,15 @@ impl App {
     }
 
     fn layout(&self) -> Layout {
-        let rows = wrapped_line_count(&self.ai_response, text_wrap_width());
+        let ai_input_rows = text_wrap::display_row_count(&self.ai_input, AI_INPUT_WIDTH as usize)
+            .max(AI_INPUT_HEIGHT as usize) as i32;
+        let response_rows =
+            text_wrap::wrapped_line_count(&self.ai_response, text_wrap_width() as usize) as i32;
         compute_layout(
             self.foo_flash.is_some(),
             self.bar_flash.is_some(),
-            rows,
+            ai_input_rows,
+            response_rows,
         )
     }
 
@@ -352,33 +368,6 @@ fn text_wrap_width() -> i32 {
     72
 }
 
-fn wrapped_lines(text: &str, width: i32) -> Vec<String> {
-    let width = width.max(1) as usize;
-    if text.is_empty() {
-        return Vec::new();
-    }
-    let mut lines = Vec::new();
-    let mut current = String::new();
-    for ch in text.chars() {
-        if ch == '\n' {
-            lines.push(std::mem::take(&mut current));
-            continue;
-        }
-        current.push(ch);
-        if current.chars().count() >= width {
-            lines.push(std::mem::take(&mut current));
-        }
-    }
-    if !current.is_empty() {
-        lines.push(current);
-    }
-    lines
-}
-
-fn wrapped_line_count(text: &str, width: i32) -> i32 {
-    wrapped_lines(text, width).len() as i32
-}
-
 fn fill_solid(win: &pancurses::Window, y: i32, x: i32, w: i32, h: i32, pair: u64) {
     win.attron(COLOR_PAIR(pair));
     for row in 0..h {
@@ -420,18 +409,22 @@ fn draw_demo_button(win: &pancurses::Window, y: i32, button: DemoButton, focused
 }
 
 fn draw_ai_input(win: &pancurses::Window, y: i32, text: &str, locked: bool, focused: bool) {
-    let display: String = text.chars().take(AI_INPUT_WIDTH as usize).collect();
+    let width = AI_INPUT_WIDTH as usize;
+    let rows = text_wrap::display_row_count(text, width) as i32;
+    let lines = text_wrap::wrapped_lines(text, width);
     let pair = text_input_color_pair(focused, locked);
-    fill_solid(win, y, COL_BTN, AI_INPUT_WIDTH, AI_INPUT_HEIGHT, pair);
+    fill_solid(win, y, COL_BTN, AI_INPUT_WIDTH, rows, pair);
     win.attron(COLOR_PAIR(pair));
-    win.mv(y, COL_BTN);
-    win.addstr(&display);
+    for (i, line) in lines.iter().enumerate() {
+        win.mv(y + i as i32, COL_BTN);
+        win.addstr(line);
+    }
     win.attroff(COLOR_PAIR(pair));
 }
 
 fn draw_ai_response(win: &pancurses::Window, y: i32, text: &str) {
     win.attron(COLOR_PAIR(PAIR_AI_RESPONSE));
-    for (i, line) in wrapped_lines(text, text_wrap_width()).iter().enumerate() {
+    for (i, line) in text_wrap::wrapped_lines(text, text_wrap_width() as usize).iter().enumerate() {
         win.mv(y + i as i32, COL_BTN);
         win.addstr(line);
     }
@@ -502,9 +495,13 @@ fn draw_ui(win: &pancurses::Window, app: &App) {
     }
 
     if app.focus == Focus::AiInput && !app.ai_input_locked {
-        let cursor_x = COL_BTN + app.ai_input_cursor as i32;
+        let (line, col) = text_wrap::cursor_display_position(
+            &app.ai_input,
+            app.ai_input_cursor,
+            AI_INPUT_WIDTH as usize,
+        );
         curs_set(1);
-        win.mv(layout.ai_input_y, cursor_x.min(COL_BTN + AI_INPUT_WIDTH - 1));
+        win.mv(layout.ai_input_y + line as i32, COL_BTN + col as i32);
     } else {
         curs_set(0);
     }
@@ -539,7 +536,7 @@ fn apply_ai_input(app: &mut App, next: Option<TextInputState>) {
 fn handle_input_char(app: &mut App, c: char) {
     apply_ai_input(
         app,
-        text_input::insert_char(&ai_input_state(app), AI_INPUT_WIDTH as usize, c),
+        text_input::insert_char(&ai_input_state(app), c),
     );
 }
 
@@ -562,7 +559,7 @@ fn handle_cursor_right(app: &mut App) {
 fn handle_tab_in_input(app: &mut App) {
     apply_ai_input(
         app,
-        text_input::insert_tab(&ai_input_state(app), AI_INPUT_WIDTH as usize),
+        text_input::insert_tab(&ai_input_state(app)),
     );
 }
 
