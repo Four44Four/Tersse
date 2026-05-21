@@ -2,6 +2,7 @@
 
 mod backend;
 mod constants;
+mod pure;
 
 use backend::{start_stream, AiStreamEvent};
 use constants::{
@@ -16,6 +17,7 @@ use constants::{
 };
 use pancurses::{echo, endwin, initscr, noecho, Input};
 use pancurses::{curs_set, COLOR_PAIR};
+use pure::text_input::{self, TextInputState};
 use std::sync::mpsc::Receiver;
 use std::time::{Duration, Instant};
 
@@ -510,104 +512,58 @@ fn draw_ui(win: &pancurses::Window, app: &App) {
     win.refresh();
 }
 
-fn ai_input_char_len(app: &App) -> usize {
-    app.ai_input.chars().count()
-}
-
-fn byte_index_for_char(s: &str, char_index: usize) -> usize {
-    s.char_indices()
-        .nth(char_index)
-        .map(|(i, _)| i)
-        .unwrap_or(s.len())
-}
-
-fn insert_char_at(s: &mut String, char_index: usize, c: char) {
-    let byte_index = byte_index_for_char(s, char_index);
-    s.insert(byte_index, c);
-}
-
-fn remove_char_before(s: &mut String, char_index: usize) -> bool {
-    if char_index == 0 {
-        return false;
-    }
-    let byte_index = byte_index_for_char(s, char_index - 1);
-    let ch_len = s[byte_index..].chars().next().unwrap().len_utf8();
-    s.drain(byte_index..byte_index + ch_len);
-    true
-}
-
-fn remove_char_at(s: &mut String, char_index: usize) -> bool {
-    if char_index >= s.chars().count() {
-        return false;
-    }
-    let byte_index = byte_index_for_char(s, char_index);
-    let ch_len = s[byte_index..].chars().next().unwrap().len_utf8();
-    s.drain(byte_index..byte_index + ch_len);
-    true
-}
-
 fn ai_input_editing(app: &App) -> bool {
     app.focus == Focus::AiInput && !app.ai_input_locked
 }
 
+fn ai_input_state(app: &App) -> TextInputState {
+    TextInputState {
+        text: app.ai_input.clone(),
+        cursor: app.ai_input_cursor,
+    }
+}
+
+fn set_ai_input_state(app: &mut App, state: TextInputState) {
+    app.ai_input = state.text;
+    app.ai_input_cursor = state.cursor;
+}
+
+fn apply_ai_input(app: &mut App, next: Option<TextInputState>) {
+    if ai_input_editing(app) {
+        if let Some(state) = next {
+            set_ai_input_state(app, state);
+        }
+    }
+}
+
 fn handle_input_char(app: &mut App, c: char) {
-    if !ai_input_editing(app) {
-        return;
-    }
-    if c.is_control() {
-        return;
-    }
-    if ai_input_char_len(app) >= AI_INPUT_WIDTH as usize {
-        return;
-    }
-    insert_char_at(&mut app.ai_input, app.ai_input_cursor, c);
-    app.ai_input_cursor += 1;
+    apply_ai_input(
+        app,
+        text_input::insert_char(&ai_input_state(app), AI_INPUT_WIDTH as usize, c),
+    );
 }
 
 fn handle_backspace(app: &mut App) {
-    if !ai_input_editing(app) {
-        return;
-    }
-    if remove_char_before(&mut app.ai_input, app.ai_input_cursor) {
-        app.ai_input_cursor -= 1;
-    }
+    apply_ai_input(app, text_input::backspace(&ai_input_state(app)));
 }
 
 fn handle_delete(app: &mut App) {
-    if !ai_input_editing(app) {
-        return;
-    }
-    remove_char_at(&mut app.ai_input, app.ai_input_cursor);
+    apply_ai_input(app, text_input::delete_forward(&ai_input_state(app)));
 }
 
 fn handle_cursor_left(app: &mut App) {
-    if !ai_input_editing(app) {
-        return;
-    }
-    if app.ai_input_cursor > 0 {
-        app.ai_input_cursor -= 1;
-    }
+    apply_ai_input(app, text_input::cursor_left(&ai_input_state(app)));
 }
 
 fn handle_cursor_right(app: &mut App) {
-    if !ai_input_editing(app) {
-        return;
-    }
-    let len = ai_input_char_len(app);
-    if app.ai_input_cursor < len {
-        app.ai_input_cursor += 1;
-    }
+    apply_ai_input(app, text_input::cursor_right(&ai_input_state(app)));
 }
 
 fn handle_tab_in_input(app: &mut App) {
-    if !ai_input_editing(app) {
-        return;
-    }
-    if ai_input_char_len(app) >= AI_INPUT_WIDTH as usize {
-        return;
-    }
-    insert_char_at(&mut app.ai_input, app.ai_input_cursor, '\t');
-    app.ai_input_cursor += 1;
+    apply_ai_input(
+        app,
+        text_input::insert_tab(&ai_input_state(app), AI_INPUT_WIDTH as usize),
+    );
 }
 
 fn apply_mouse_focus(app: &mut App, layout: Layout, row: i32, col: i32) {
