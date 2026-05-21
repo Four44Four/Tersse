@@ -1,36 +1,6 @@
 # Purpose
  - Rust based MCP multi agent orchestration customizer TUI thing idk
 
-# Hello-world curses demo
-
-Cross-platform curses TUI using [pancurses](https://crates.io/crates/pancurses) (ncurses on Unix/Linux/macOS, PDCurses in the **current console** on Windows via the `win32` feature).
-
-## Run
-
-```bash
-cargo run
-```
-
-Release build:
-
-```bash
-cargo run --release
-```
-
-Activating a button shows its label (`Foo` or `Bar`) under that button for **2 seconds**. Quit with **Q** or **Esc**.
-
-## Platform notes
-
-| OS | Backend | Prerequisites |
-|----|---------|---------------|
-| Linux | ncurses | `libncurses-dev` (Debian/Ubuntu) or `ncurses` (Fedora/Arch) |
-| macOS | ncurses | Xcode CLI tools; ncurses is usually available |
-| Unix (BSD, etc.) | ncurses | OS `ncurses` / `ncursesw` development package |
-| Windows | PDCurses `win32` (console) | Run from cmd, PowerShell, or Windows Terminal; MSVC or MinGW for build |
-| DOS | PDCurses for DOS | Not built by default. Requires a DOS Rust toolchain and linking against a [PDCurses DOS port](https://github.com/wmcbrine/PDCurses); the app uses only portable curses APIs. |
-
-Windows Terminal, cmd, PowerShell, and most modern Unix terminals work. Use a true terminal emulator (not a raw DOS box) for mouse support where available.
-
 # Intended Features
  - TUI interface
     - All user interface related features will be accessible through a lightweight curses interface
