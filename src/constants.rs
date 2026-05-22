@@ -82,6 +82,9 @@ pub const TEXT_INPUT_LOCKED_NON_HOVERED_COLOR_BG: i16 = -1;
 pub const TEXT_INPUT_LOCKED_HOVERED_COLOR_FG: i16 = pancurses::COLOR_RED;
 pub const TEXT_INPUT_LOCKED_HOVERED_COLOR_BG: i16 = pancurses::COLOR_WHITE;
 
+pub const TEXT_INPUT_SELECT_FG_COLOR: i16 = pancurses::COLOR_WHITE;
+pub const TEXT_INPUT_SELECT_BG_COLOR: i16 = pancurses::COLOR_BLACK;
+
 pub const AI_RES_TEXT_COLOR: i16 = pancurses::COLOR_WHITE;
 pub const AI_RES_TEXT_BG: i16 = -1;
 
@@ -100,6 +103,7 @@ pub const PAIR_AI_RESPONSE: u64 = 4;
 pub const PAIR_TEXT_INPUT_HOVERED: u64 = 5;
 pub const PAIR_TEXT_INPUT_LOCKED_NON_HOVERED: u64 = 6;
 pub const PAIR_TEXT_INPUT_LOCKED_FOCUSED: u64 = 7;
+pub const PAIR_TEXT_INPUT_SELECT: u64 = 8;
 
 pub const BTN_NORMAL_FG: i16 = pancurses::COLOR_WHITE;
 pub const BTN_NORMAL_BG: i16 = pancurses::COLOR_BLUE;
@@ -148,6 +152,11 @@ pub fn init_ui_colors() {
             PAIR_TEXT_INPUT_LOCKED_FOCUSED as i16,
             TEXT_INPUT_LOCKED_HOVERED_COLOR_FG,
             TEXT_INPUT_LOCKED_HOVERED_COLOR_BG,
+        );
+        init_pair(
+            PAIR_TEXT_INPUT_SELECT as i16,
+            TEXT_INPUT_SELECT_FG_COLOR,
+            TEXT_INPUT_SELECT_BG_COLOR,
         );
 
         init_pair(
