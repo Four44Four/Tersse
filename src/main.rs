@@ -3,6 +3,7 @@
 mod backend;
 mod constants;
 mod pure;
+mod terminal_input;
 
 use backend::{start_stream, AiStreamEvent};
 use constants::{
@@ -12,11 +13,12 @@ use constants::{
     AI_NO_PROMPT_RES_TEXT, AI_RES_WAITING_TEXT, BTN_HEIGHT, BTN_WIDTH, CLEAR_RESP_BTN_HEIGHT,
     CLEAR_RESP_BTN_LABEL,
     CLEAR_RESP_BTN_WIDTH, COL_BTN, COL_FLASH_TEXT, COL_TITLE, PAIR_AI_RESPONSE,
-    PAIR_TEXT_INPUT_LOCKED_NON_HOVERED, ROW_FIRST_BTN,
+    PAIR_TEXT_INPUT_LOCKED_NON_HOVERED, PAIR_TEXT_INPUT_SELECT, ROW_FIRST_BTN,
     ROW_TITLE, TEST_AI_BTN_HEIGHT, TEST_AI_BTN_LABEL, TEST_AI_BTN_WIDTH,
 };
-use pancurses::{echo, endwin, initscr, noecho, Input};
+use pancurses::{echo, endwin, initscr, noecho};
 use pancurses::{curs_set, COLOR_PAIR};
+use terminal_input::TerminalKey;
 use pure::text_input::{self, TextInputState};
 use pure::text_wrap;
 use std::sync::mpsc::Receiver;
@@ -211,6 +213,7 @@ struct App {
     bar_flash: Option<Instant>,
     ai_input: String,
     ai_input_cursor: usize,
+    ai_input_selection_anchor: Option<usize>,
     ai_input_locked: bool,
     ai_response: String,
     ai_streaming: bool,
@@ -228,6 +231,7 @@ impl App {
             bar_flash: None,
             ai_input: String::new(),
             ai_input_cursor: 0,
+            ai_input_selection_anchor: None,
             ai_input_locked: false,
             ai_response: String::new(),
             ai_streaming: false,
@@ -295,6 +299,7 @@ impl App {
         };
 
         self.ai_input_locked = true;
+        self.ai_input_selection_anchor = None;
         self.ai_response.clear();
         self.show_clear_response = false;
         self.ai_streaming = true;
@@ -306,6 +311,7 @@ impl App {
         self.ai_response.clear();
         self.show_clear_response = false;
         self.ai_input_locked = false;
+        self.ai_input_selection_anchor = None;
         if self.focus == Focus::ClearResponse {
             self.focus = Focus::TestAi;
         }
@@ -408,18 +414,44 @@ fn draw_demo_button(win: &pancurses::Window, y: i32, button: DemoButton, focused
     );
 }
 
-fn draw_ai_input(win: &pancurses::Window, y: i32, text: &str, locked: bool, focused: bool) {
+fn draw_ai_input(
+    win: &pancurses::Window,
+    y: i32,
+    text: &str,
+    cursor: usize,
+    selection_anchor: Option<usize>,
+    locked: bool,
+    focused: bool,
+) {
     let width = AI_INPUT_WIDTH as usize;
     let rows = text_wrap::display_row_count(text, width) as i32;
-    let lines = text_wrap::wrapped_lines(text, width);
     let pair = text_input_color_pair(focused, locked);
     fill_solid(win, y, COL_BTN, AI_INPUT_WIDTH, rows, pair);
-    win.attron(COLOR_PAIR(pair));
-    for (i, line) in lines.iter().enumerate() {
-        win.mv(y + i as i32, COL_BTN);
-        win.addstr(line);
+
+    let input_state = TextInputState {
+        text: text.to_string(),
+        cursor,
+        selection_anchor,
+    };
+    let selection = text_input::selection_range(&input_state);
+
+    let mut char_index = 0usize;
+    for ch in text.chars() {
+        let (line, col) = text_wrap::cursor_display_position(text, char_index, width);
+        let selected = selection
+            .map(|(start, end)| char_index >= start && char_index < end)
+            .unwrap_or(false);
+        let ch_pair = if selected {
+            PAIR_TEXT_INPUT_SELECT
+        } else {
+            pair
+        };
+        win.attron(COLOR_PAIR(ch_pair));
+        win.mv(y + line as i32, COL_BTN + col as i32);
+        win.addch(ch);
+        win.attroff(COLOR_PAIR(ch_pair));
+        char_index += 1;
     }
-    win.attroff(COLOR_PAIR(pair));
 }
 
 fn draw_ai_response(win: &pancurses::Window, y: i32, text: &str) {
@@ -462,6 +494,8 @@ fn draw_ui(win: &pancurses::Window, app: &App) {
         win,
         layout.ai_input_y,
         &app.ai_input,
+        app.ai_input_cursor,
+        app.ai_input_selection_anchor,
         app.ai_input_locked,
         app.focus == Focus::AiInput,
     );
@@ -517,12 +551,14 @@ fn ai_input_state(app: &App) -> TextInputState {
     TextInputState {
         text: app.ai_input.clone(),
         cursor: app.ai_input_cursor,
+        selection_anchor: app.ai_input_selection_anchor,
     }
 }
 
 fn set_ai_input_state(app: &mut App, state: TextInputState) {
     app.ai_input = state.text;
     app.ai_input_cursor = state.cursor;
+    app.ai_input_selection_anchor = state.selection_anchor;
 }
 
 fn apply_ai_input(app: &mut App, next: Option<TextInputState>) {
@@ -548,12 +584,18 @@ fn handle_delete(app: &mut App) {
     apply_ai_input(app, text_input::delete_forward(&ai_input_state(app)));
 }
 
-fn handle_cursor_left(app: &mut App) {
-    apply_ai_input(app, text_input::cursor_left(&ai_input_state(app)));
+fn handle_cursor_left(app: &mut App, extend_selection: bool) {
+    apply_ai_input(
+        app,
+        text_input::cursor_left(&ai_input_state(app), extend_selection),
+    );
 }
 
-fn handle_cursor_right(app: &mut App) {
-    apply_ai_input(app, text_input::cursor_right(&ai_input_state(app)));
+fn handle_cursor_right(app: &mut App, extend_selection: bool) {
+    apply_ai_input(
+        app,
+        text_input::cursor_right(&ai_input_state(app), extend_selection),
+    );
 }
 
 fn handle_tab_in_input(app: &mut App) {
@@ -587,11 +629,11 @@ fn apply_mouse_focus(app: &mut App, layout: Layout, row: i32, col: i32) {
 fn main() {
     load_env_files();
 
+    let _ = terminal_input::enter_raw_mode();
+
     let win = initscr();
     noecho();
     curs_set(0);
-    win.keypad(true);
-    win.timeout(POLL_MS);
 
     if ALLOW_MOUSE_INPUT {
         let _ = pancurses::mousemask(pancurses::BUTTON1_CLICKED, None);
@@ -604,61 +646,57 @@ fn main() {
     while !app.quit {
         app.tick();
 
-        match win.getch() {
-            Some(Input::Character('\t')) => {
+        let key = terminal_input::poll_key(Duration::from_millis(POLL_MS as u64))
+            .ok()
+            .flatten();
+        match key {
+            Some(TerminalKey::Tab) => {
                 if ai_input_editing(&app) {
                     handle_tab_in_input(&mut app);
                 } else {
                     app.focus = app.focus.next(app.show_clear_response);
                 }
             }
-            Some(Input::Character(c)) if matches!(c, 'q' | 'Q') && app.focus != Focus::AiInput => {
+            Some(TerminalKey::Escape) => app.quit = true,
+            Some(TerminalKey::Quit) if app.focus != Focus::AiInput => {
                 app.quit = true;
             }
-            Some(Input::Character('\x1b')) => app.quit = true,
-            Some(Input::Character(c)) if matches!(c, '\n' | '\r' | ' ') => {
+            Some(TerminalKey::Enter) => {
+                if !(app.focus == Focus::AiInput && !app.ai_input_locked) {
+                    app.activate_focused();
+                }
+            }
+            Some(TerminalKey::Space) => {
                 if app.focus == Focus::AiInput && !app.ai_input_locked {
-                    if c == ' ' {
-                        handle_input_char(&mut app, ' ');
-                    }
+                    handle_input_char(&mut app, ' ');
                 } else {
                     app.activate_focused();
                 }
             }
-            Some(Input::Character(c)) if c == '\x08' || c == '\x7f' => handle_backspace(&mut app),
-            Some(Input::Character(c)) => handle_input_char(&mut app, c),
-            Some(Input::KeyBackspace) => handle_backspace(&mut app),
-            Some(Input::KeyDC) => handle_delete(&mut app),
-            Some(Input::KeyLeft) => {
+            Some(TerminalKey::Backspace) => handle_backspace(&mut app),
+            Some(TerminalKey::Delete) => handle_delete(&mut app),
+            Some(TerminalKey::Left { extend_selection }) => {
                 if ai_input_editing(&app) {
-                    handle_cursor_left(&mut app);
+                    handle_cursor_left(&mut app, extend_selection);
                 } else {
                     app.focus = app.focus.prev(app.show_clear_response);
                 }
             }
-            Some(Input::KeyRight) => {
+            Some(TerminalKey::Right { extend_selection }) => {
                 if ai_input_editing(&app) {
-                    handle_cursor_right(&mut app);
+                    handle_cursor_right(&mut app, extend_selection);
                 } else {
                     app.focus = app.focus.next(app.show_clear_response);
                 }
             }
-            Some(Input::KeyUp) => {
+            Some(TerminalKey::Up) => {
                 app.focus = app.focus.prev(app.show_clear_response);
             }
-            Some(Input::KeyDown) => {
+            Some(TerminalKey::Down) => {
                 app.focus = app.focus.next(app.show_clear_response);
             }
-            Some(Input::KeyMouse) if ALLOW_MOUSE_INPUT => {
-                if let Ok(evt) = pancurses::getmouse() {
-                    if evt.bstate & pancurses::BUTTON1_CLICKED != 0 {
-                        let layout = app.layout();
-                        apply_mouse_focus(&mut app, layout, evt.y, evt.x);
-                        app.activate_focused();
-                    }
-                }
-            }
-            Some(_) | None => {}
+            Some(TerminalKey::Char(c)) => handle_input_char(&mut app, c),
+            Some(TerminalKey::Quit) | None => {}
         }
 
         draw_ui(&win, &app);
@@ -667,4 +705,5 @@ fn main() {
     curs_set(1);
     echo();
     endwin();
+    let _ = terminal_input::leave_raw_mode();
 }
