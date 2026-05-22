@@ -34,10 +34,6 @@ pub fn gemini_model() -> String {
         .unwrap_or_else(|_| GEMINI_MODEL.to_string())
 }
 
-// --- Input ---
-
-pub const ALLOW_MOUSE_INPUT: bool = false;
-
 // --- Positions ---
 
 pub const ROW_TITLE: i32 = 0;

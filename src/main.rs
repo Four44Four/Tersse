@@ -8,7 +8,7 @@ mod terminal_input;
 use backend::{start_stream, AiStreamEvent};
 use constants::{
     button_color_pair, clear_resp_btn_x, gemini_api_key, init_ui_colors, load_env_files,
-    text_input_color_pair, ALLOW_MOUSE_INPUT, AI_INPUT_HEIGHT, AI_INPUT_WIDTH,
+    text_input_color_pair, AI_INPUT_HEIGHT, AI_INPUT_WIDTH,
     AI_MISSING_API_KEY_RES_TEXT,
     AI_NO_PROMPT_RES_TEXT, AI_RES_WAITING_TEXT, BTN_HEIGHT, BTN_WIDTH, CLEAR_RESP_BTN_HEIGHT,
     CLEAR_RESP_BTN_LABEL,
@@ -36,8 +36,6 @@ enum DemoButton {
 }
 
 impl DemoButton {
-    const ALL: [DemoButton; 2] = [DemoButton::Foo, DemoButton::Bar];
-
     fn label(self) -> &'static str {
         match self {
             DemoButton::Foo => "Foo",
@@ -50,17 +48,6 @@ impl DemoButton {
             DemoButton::Foo => "Button 1",
             DemoButton::Bar => "Button 2",
         }
-    }
-
-    fn index(self) -> usize {
-        match self {
-            DemoButton::Foo => 0,
-            DemoButton::Bar => 1,
-        }
-    }
-
-    fn from_index(i: usize) -> DemoButton {
-        Self::ALL[i % 2]
     }
 }
 
@@ -114,7 +101,6 @@ struct Layout {
     foo_flash_y: Option<i32>,
     bar_flash_y: Option<i32>,
     ai_input_y: i32,
-    ai_input_height: i32,
     test_ai_y: i32,
     ai_response_y: i32,
     _ai_response_rows: i32,
@@ -151,8 +137,7 @@ fn compute_layout(
     };
 
     let ai_input_y = y;
-    let ai_input_height = ai_input_rows;
-    y += ai_input_height;
+    y += ai_input_rows;
 
     let test_ai_y = y;
     y += TEST_AI_BTN_HEIGHT;
@@ -165,45 +150,9 @@ fn compute_layout(
         foo_flash_y,
         bar_flash_y,
         ai_input_y,
-        ai_input_height,
         test_ai_y,
         ai_response_y,
         _ai_response_rows: ai_response_rows,
-    }
-}
-
-impl Layout {
-    fn hit_demo_button(self, row: i32, col: i32) -> Option<DemoButton> {
-        if col < COL_BTN || col >= COL_BTN + BTN_WIDTH {
-            return None;
-        }
-        if row >= self.foo_y && row < self.foo_y + BTN_HEIGHT {
-            return Some(DemoButton::Foo);
-        }
-        if row >= self.bar_y && row < self.bar_y + BTN_HEIGHT {
-            return Some(DemoButton::Bar);
-        }
-        None
-    }
-
-    fn hit_ai_input(self, row: i32, col: i32) -> bool {
-        row >= self.ai_input_y
-            && row < self.ai_input_y + self.ai_input_height
-            && col >= COL_BTN
-            && col < COL_BTN + AI_INPUT_WIDTH
-    }
-
-    fn hit_test_ai(self, row: i32, col: i32) -> bool {
-        row == self.test_ai_y
-            && col >= COL_BTN
-            && col < COL_BTN + TEST_AI_BTN_WIDTH
-    }
-
-    fn hit_clear_response(self, row: i32, col: i32) -> bool {
-        let x = clear_resp_btn_x();
-        row == self.test_ai_y
-            && col >= x
-            && col < x + CLEAR_RESP_BTN_WIDTH
     }
 }
 
@@ -605,27 +554,6 @@ fn handle_tab_in_input(app: &mut App) {
     );
 }
 
-fn apply_mouse_focus(app: &mut App, layout: Layout, row: i32, col: i32) {
-    if let Some(btn) = layout.hit_demo_button(row, col) {
-        app.focus = match btn {
-            DemoButton::Foo => Focus::Foo,
-            DemoButton::Bar => Focus::Bar,
-        };
-        return;
-    }
-    if layout.hit_ai_input(row, col) {
-        app.focus = Focus::AiInput;
-        return;
-    }
-    if layout.hit_test_ai(row, col) {
-        app.focus = Focus::TestAi;
-        return;
-    }
-    if app.show_clear_response && layout.hit_clear_response(row, col) {
-        app.focus = Focus::ClearResponse;
-    }
-}
-
 fn main() {
     load_env_files();
 
@@ -634,10 +562,6 @@ fn main() {
     let win = initscr();
     noecho();
     curs_set(0);
-
-    if ALLOW_MOUSE_INPUT {
-        let _ = pancurses::mousemask(pancurses::BUTTON1_CLICKED, None);
-    }
     init_ui_colors();
 
     let mut app = App::new();
