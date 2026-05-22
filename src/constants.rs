@@ -81,9 +81,6 @@ pub const TEXT_INPUT_LOCKED_HOVERED_COLOR_BG: i16 = pancurses::COLOR_WHITE;
 pub const TEXT_INPUT_SELECT_FG_COLOR: i16 = pancurses::COLOR_WHITE;
 pub const TEXT_INPUT_SELECT_BG_COLOR: i16 = pancurses::COLOR_BLACK;
 
-pub const AI_RES_TEXT_COLOR: i16 = pancurses::COLOR_WHITE;
-pub const AI_RES_TEXT_BG: i16 = -1;
-
 /// Shown as AI response text when **Test AI** is used with an empty prompt.
 pub const AI_NO_PROMPT_RES_TEXT: &str = "Please enter a prompt";
 
@@ -95,16 +92,20 @@ pub const AI_RES_WAITING_TEXT: &str = "Waiting for response...";
 pub const PAIR_BTN_NORMAL: u64 = 1;
 pub const PAIR_BTN_FOCUSED: u64 = 2;
 pub const PAIR_TEXT_INPUT_NON_HOVERED: u64 = 3;
-pub const PAIR_AI_RESPONSE: u64 = 4;
-pub const PAIR_TEXT_INPUT_HOVERED: u64 = 5;
-pub const PAIR_TEXT_INPUT_LOCKED_NON_HOVERED: u64 = 6;
-pub const PAIR_TEXT_INPUT_LOCKED_FOCUSED: u64 = 7;
-pub const PAIR_TEXT_INPUT_SELECT: u64 = 8;
+pub const PAIR_TEXT_INPUT_HOVERED: u64 = 4;
+pub const PAIR_TEXT_INPUT_LOCKED_NON_HOVERED: u64 = 5;
+pub const PAIR_TEXT_INPUT_LOCKED_FOCUSED: u64 = 6;
+pub const PAIR_TEXT_INPUT_SELECT: u64 = 7;
 
 pub const BTN_NORMAL_FG: i16 = pancurses::COLOR_WHITE;
 pub const BTN_NORMAL_BG: i16 = pancurses::COLOR_BLUE;
 pub const BTN_FOCUSED_FG: i16 = pancurses::COLOR_BLACK;
 pub const BTN_FOCUSED_BG: i16 = pancurses::COLOR_CYAN;
+
+/// Color pair for AI output (same locked-input colors, including hover background).
+pub fn ai_output_color_pair(focused: bool) -> u64 {
+    text_input_color_pair(focused, true)
+}
 
 /// Color pair for the text input in the given focus / lock state.
 pub fn text_input_color_pair(focused: bool, locked: bool) -> u64 {
@@ -153,12 +154,6 @@ pub fn init_ui_colors() {
             PAIR_TEXT_INPUT_SELECT as i16,
             TEXT_INPUT_SELECT_FG_COLOR,
             TEXT_INPUT_SELECT_BG_COLOR,
-        );
-
-        init_pair(
-            PAIR_AI_RESPONSE as i16,
-            AI_RES_TEXT_COLOR,
-            AI_RES_TEXT_BG,
         );
     }
 }

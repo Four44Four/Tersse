@@ -1,5 +1,6 @@
 //! Minimal terminal curses UI with Gemini streaming test.
 
+mod ai_output;
 mod backend;
 mod constants;
 mod pure;
@@ -12,8 +13,8 @@ use constants::{
     AI_MISSING_API_KEY_RES_TEXT,
     AI_NO_PROMPT_RES_TEXT, AI_RES_WAITING_TEXT, BTN_HEIGHT, BTN_WIDTH, CLEAR_RESP_BTN_HEIGHT,
     CLEAR_RESP_BTN_LABEL,
-    CLEAR_RESP_BTN_WIDTH, COL_BTN, COL_FLASH_TEXT, COL_TITLE, PAIR_AI_RESPONSE,
-    PAIR_TEXT_INPUT_LOCKED_NON_HOVERED, PAIR_TEXT_INPUT_SELECT, ROW_FIRST_BTN,
+    CLEAR_RESP_BTN_WIDTH, COL_BTN, COL_FLASH_TEXT, COL_TITLE,
+    PAIR_TEXT_INPUT_SELECT, ROW_FIRST_BTN,
     ROW_TITLE, TEST_AI_BTN_HEIGHT, TEST_AI_BTN_LABEL, TEST_AI_BTN_WIDTH,
 };
 use pancurses::{echo, endwin, initscr, noecho};
@@ -58,10 +59,11 @@ enum Focus {
     AiInput,
     TestAi,
     ClearResponse,
+    AiOutput,
 }
 
 impl Focus {
-    fn next(self, show_clear: bool) -> Self {
+    fn next(self, show_clear: bool, show_output: bool) -> Self {
         match self {
             Focus::Foo => Focus::Bar,
             Focus::Bar => Focus::AiInput,
@@ -69,17 +71,35 @@ impl Focus {
             Focus::TestAi => {
                 if show_clear {
                     Focus::ClearResponse
+                } else if show_output {
+                    Focus::AiOutput
                 } else {
                     Focus::Foo
                 }
             }
-            Focus::ClearResponse => Focus::Foo,
+            Focus::ClearResponse => {
+                if show_output {
+                    Focus::AiOutput
+                } else {
+                    Focus::Foo
+                }
+            }
+            Focus::AiOutput => Focus::Foo,
         }
     }
 
-    fn prev(self, show_clear: bool) -> Self {
+    fn prev(self, show_clear: bool, show_output: bool) -> Self {
         match self {
             Focus::Foo => {
+                if show_output {
+                    Focus::AiOutput
+                } else if show_clear {
+                    Focus::ClearResponse
+                } else {
+                    Focus::TestAi
+                }
+            }
+            Focus::AiOutput => {
                 if show_clear {
                     Focus::ClearResponse
                 } else {
@@ -103,15 +123,9 @@ struct Layout {
     ai_input_y: i32,
     test_ai_y: i32,
     ai_response_y: i32,
-    _ai_response_rows: i32,
 }
 
-fn compute_layout(
-    foo_flash: bool,
-    bar_flash: bool,
-    ai_input_rows: i32,
-    ai_response_rows: i32,
-) -> Layout {
+fn compute_layout(foo_flash: bool, bar_flash: bool, ai_input_rows: i32) -> Layout {
     let mut y = ROW_FIRST_BTN;
 
     let foo_y = y;
@@ -152,7 +166,6 @@ fn compute_layout(
         ai_input_y,
         test_ai_y,
         ai_response_y,
-        _ai_response_rows: ai_response_rows,
     }
 }
 
@@ -165,6 +178,7 @@ struct App {
     ai_input_selection_anchor: Option<usize>,
     ai_input_locked: bool,
     ai_response: String,
+    ai_response_scroll: usize,
     ai_streaming: bool,
     ai_rx: Option<Receiver<AiStreamEvent>>,
     show_clear_response: bool,
@@ -183,6 +197,7 @@ impl App {
             ai_input_selection_anchor: None,
             ai_input_locked: false,
             ai_response: String::new(),
+            ai_response_scroll: 0,
             ai_streaming: false,
             ai_rx: None,
             show_clear_response: false,
@@ -199,14 +214,55 @@ impl App {
     fn layout(&self) -> Layout {
         let ai_input_rows = text_wrap::display_row_count(&self.ai_input, AI_INPUT_WIDTH as usize)
             .max(AI_INPUT_HEIGHT as usize) as i32;
-        let response_rows =
-            text_wrap::wrapped_line_count(&self.ai_response, text_wrap_width() as usize) as i32;
         compute_layout(
             self.foo_flash.is_some(),
             self.bar_flash.is_some(),
             ai_input_rows,
-            response_rows,
         )
+    }
+
+    fn ai_output_viewport(&self, win: &pancurses::Window) -> ai_output::AiOutputViewport {
+        ai_output::AiOutputViewport::from_window(win, self.layout().ai_response_y)
+    }
+
+    fn ai_output_shown(&self) -> bool {
+        self.ai_waiting_for_first_token() || !self.ai_response.is_empty()
+    }
+
+    fn focus_nav(&self) -> (bool, bool) {
+        (self.show_clear_response, self.ai_output_shown())
+    }
+
+    fn ai_output_hovered(&self) -> bool {
+        self.focus == Focus::AiOutput
+    }
+
+    fn ai_output_content_overflows(&self, win: &pancurses::Window) -> bool {
+        if self.ai_waiting_for_first_token() || !self.ai_output_shown() {
+            return false;
+        }
+        let viewport = self.ai_output_viewport(win);
+        ai_output::content_overflows(&self.ai_response, viewport)
+    }
+
+    fn ai_output_scrollable(&self, win: &pancurses::Window) -> bool {
+        self.ai_output_hovered() && self.ai_output_content_overflows(win)
+    }
+
+    fn sync_ai_output_scroll(&mut self, win: &pancurses::Window) {
+        if !self.ai_output_shown() || self.ai_waiting_for_first_token() {
+            self.ai_response_scroll = 0;
+            return;
+        }
+        if !self.ai_output_hovered() {
+            return;
+        }
+        let viewport = self.ai_output_viewport(win);
+        self.ai_response_scroll = if self.ai_streaming {
+            ai_output::stick_to_bottom(&self.ai_response, viewport)
+        } else {
+            ai_output::clamp_scroll(self.ai_response_scroll, &self.ai_response, viewport)
+        };
     }
 
     fn activate_demo(&mut self, button: DemoButton) {
@@ -250,6 +306,7 @@ impl App {
         self.ai_input_locked = true;
         self.ai_input_selection_anchor = None;
         self.ai_response.clear();
+        self.ai_response_scroll = 0;
         self.show_clear_response = false;
         self.ai_streaming = true;
         self.last_ai_request_at = Some(Instant::now());
@@ -258,10 +315,11 @@ impl App {
 
     fn clear_ai_response(&mut self) {
         self.ai_response.clear();
+        self.ai_response_scroll = 0;
         self.show_clear_response = false;
         self.ai_input_locked = false;
         self.ai_input_selection_anchor = None;
-        if self.focus == Focus::ClearResponse {
+        if matches!(self.focus, Focus::ClearResponse | Focus::AiOutput) {
             self.focus = Focus::TestAi;
         }
     }
@@ -300,7 +358,7 @@ impl App {
             Focus::Bar => self.activate_demo(DemoButton::Bar),
             Focus::TestAi => self.start_ai_request(),
             Focus::ClearResponse => self.clear_ai_response(),
-            Focus::AiInput => {}
+            Focus::AiInput | Focus::AiOutput => {}
         }
     }
 
@@ -308,6 +366,9 @@ impl App {
         tick_flash(&mut self.foo_flash);
         tick_flash(&mut self.bar_flash);
         self.poll_ai();
+        if self.focus == Focus::AiOutput && !self.ai_output_shown() {
+            self.focus = Focus::TestAi;
+        }
     }
 }
 
@@ -317,10 +378,6 @@ fn tick_flash(slot: &mut Option<Instant>) {
             *slot = None;
         }
     }
-}
-
-fn text_wrap_width() -> i32 {
-    72
 }
 
 fn fill_solid(win: &pancurses::Window, y: i32, x: i32, w: i32, h: i32, pair: u64) {
@@ -403,24 +460,9 @@ fn draw_ai_input(
     }
 }
 
-fn draw_ai_response(win: &pancurses::Window, y: i32, text: &str) {
-    win.attron(COLOR_PAIR(PAIR_AI_RESPONSE));
-    for (i, line) in text_wrap::wrapped_lines(text, text_wrap_width() as usize).iter().enumerate() {
-        win.mv(y + i as i32, COL_BTN);
-        win.addstr(line);
-    }
-    win.attroff(COLOR_PAIR(PAIR_AI_RESPONSE));
-}
-
-fn draw_ai_waiting(win: &pancurses::Window, y: i32, text: &str) {
-    win.attron(COLOR_PAIR(PAIR_TEXT_INPUT_LOCKED_NON_HOVERED));
-    win.mv(y, COL_BTN);
-    win.addstr(text);
-    win.attroff(COLOR_PAIR(PAIR_TEXT_INPUT_LOCKED_NON_HOVERED));
-}
-
 fn draw_ui(win: &pancurses::Window, app: &App) {
     let layout = app.layout();
+    let output_viewport = app.ai_output_viewport(win);
 
     win.erase();
 
@@ -471,10 +513,23 @@ fn draw_ui(win: &pancurses::Window, app: &App) {
         );
     }
 
+    let output_focused = app.focus == Focus::AiOutput;
     if app.ai_waiting_for_first_token() {
-        draw_ai_waiting(win, layout.ai_response_y, AI_RES_WAITING_TEXT);
+        ai_output::draw_line(
+            win,
+            layout.ai_response_y,
+            AI_RES_WAITING_TEXT,
+            output_viewport,
+            output_focused,
+        );
     } else if !app.ai_response.is_empty() {
-        draw_ai_response(win, layout.ai_response_y, &app.ai_response);
+        ai_output::draw_scrollable(
+            win,
+            &app.ai_response,
+            app.ai_response_scroll,
+            output_viewport,
+            output_focused,
+        );
     }
 
     if app.focus == Focus::AiInput && !app.ai_input_locked {
@@ -569,6 +624,7 @@ fn main() {
 
     while !app.quit {
         app.tick();
+        app.sync_ai_output_scroll(&win);
 
         let key = terminal_input::poll_key(Duration::from_millis(POLL_MS as u64))
             .ok()
@@ -578,7 +634,8 @@ fn main() {
                 if ai_input_editing(&app) {
                     handle_tab_in_input(&mut app);
                 } else {
-                    app.focus = app.focus.next(app.show_clear_response);
+                    let nav = app.focus_nav();
+                    app.focus = app.focus.next(nav.0, nav.1);
                 }
             }
             Some(TerminalKey::Escape) => app.quit = true,
@@ -597,30 +654,53 @@ fn main() {
                     app.activate_focused();
                 }
             }
-            Some(TerminalKey::Backspace) => handle_backspace(&mut app),
-            Some(TerminalKey::Delete) => handle_delete(&mut app),
+            Some(TerminalKey::Backspace) if ai_input_editing(&app) => handle_backspace(&mut app),
+            Some(TerminalKey::Delete) if ai_input_editing(&app) => handle_delete(&mut app),
             Some(TerminalKey::Left { extend_selection }) => {
                 if ai_input_editing(&app) {
                     handle_cursor_left(&mut app, extend_selection);
                 } else {
-                    app.focus = app.focus.prev(app.show_clear_response);
+                    let nav = app.focus_nav();
+                    app.focus = app.focus.prev(nav.0, nav.1);
                 }
             }
             Some(TerminalKey::Right { extend_selection }) => {
                 if ai_input_editing(&app) {
                     handle_cursor_right(&mut app, extend_selection);
                 } else {
-                    app.focus = app.focus.next(app.show_clear_response);
+                    let nav = app.focus_nav();
+                    app.focus = app.focus.next(nav.0, nav.1);
                 }
             }
             Some(TerminalKey::Up) => {
-                app.focus = app.focus.prev(app.show_clear_response);
+                let nav = app.focus_nav();
+                app.focus = app.focus.prev(nav.0, nav.1);
             }
             Some(TerminalKey::Down) => {
-                app.focus = app.focus.next(app.show_clear_response);
+                let nav = app.focus_nav();
+                app.focus = app.focus.next(nav.0, nav.1);
             }
-            Some(TerminalKey::Char(c)) => handle_input_char(&mut app, c),
-            Some(TerminalKey::Quit) | None => {}
+            Some(TerminalKey::AltUp)
+                if app.ai_output_scrollable(&win) && app.ai_response_scroll > 0 =>
+            {
+                app.ai_response_scroll = ai_output::scroll_up(app.ai_response_scroll);
+            }
+            Some(TerminalKey::AltDown) if app.ai_output_scrollable(&win) => {
+                let viewport = app.ai_output_viewport(&win);
+                app.ai_response_scroll = ai_output::scroll_down(
+                    app.ai_response_scroll,
+                    &app.ai_response,
+                    viewport,
+                );
+            }
+            Some(TerminalKey::Char(c)) if ai_input_editing(&app) => handle_input_char(&mut app, c),
+            Some(TerminalKey::Backspace)
+            | Some(TerminalKey::Delete)
+            | Some(TerminalKey::Char(_))
+            | Some(TerminalKey::Quit)
+            | Some(TerminalKey::AltUp)
+            | Some(TerminalKey::AltDown)
+            | None => {}
         }
 
         draw_ui(&win, &app);

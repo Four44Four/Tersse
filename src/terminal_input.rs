@@ -26,6 +26,8 @@ pub enum TerminalKey {
     },
     Up,
     Down,
+    AltUp,
+    AltDown,
     Char(char),
 }
 
@@ -67,6 +69,8 @@ fn map_key_event(key: KeyEvent) -> Option<TerminalKey> {
         KeyCode::Right => Some(TerminalKey::Right {
             extend_selection: extend,
         }),
+        KeyCode::Up if key.modifiers.contains(KeyModifiers::ALT) => Some(TerminalKey::AltUp),
+        KeyCode::Down if key.modifiers.contains(KeyModifiers::ALT) => Some(TerminalKey::AltDown),
         KeyCode::Up => Some(TerminalKey::Up),
         KeyCode::Down => Some(TerminalKey::Down),
         KeyCode::Char('q' | 'Q') => Some(TerminalKey::Quit),
