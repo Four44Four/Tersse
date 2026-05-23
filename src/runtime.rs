@@ -7,6 +7,7 @@ use crate::ScreenTitle;
 
 mod colors;
 mod core;
+mod element_store;
 mod elements;
 mod events;
 mod focus;
@@ -22,7 +23,7 @@ pub use types::{
     TextInputConfig, TextInputStyle, UiEvent,
 };
 
-use types::RuntimeElement;
+use element_store::ElementStore;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct TextInputLayoutCache {
@@ -62,7 +63,7 @@ pub fn runtime_text_input_state_snapshot(
 pub struct RuntimeUi {
     win: Window,
     title: Option<ScreenTitle>,
-    elements: Vec<RuntimeElement>,
+    elements: ElementStore,
     focused_position: usize,
     pair_cache: HashMap<(i16, i16), i16>,
     next_pair_id: i16,

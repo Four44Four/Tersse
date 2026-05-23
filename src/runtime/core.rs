@@ -6,6 +6,7 @@ use crate::terminal_input;
 use crate::terminal_input::{TerminalKey, TerminalPoll};
 use crate::ScreenTitle;
 
+use super::element_store::ElementStore;
 use super::types::UiEvent;
 use super::RuntimeUi;
 
@@ -21,7 +22,7 @@ impl RuntimeUi {
         let mut ui = Self {
             win,
             title: None,
-            elements: Vec::new(),
+            elements: ElementStore::new(),
             focused_position: 0,
             pair_cache: std::collections::HashMap::new(),
             next_pair_id: 1,

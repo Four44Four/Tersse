@@ -32,7 +32,7 @@ pub struct ButtonConfig {
     pub label: String,
     pub width: usize,
     pub location: Location,
-    pub focus_index: usize,
+    pub focus_number: f64,
     pub style: FocusStyle,
     pub on_press: ButtonHandler,
 }
@@ -41,7 +41,7 @@ pub struct TextInputConfig {
     pub id: String,
     pub width: usize,
     pub location: Location,
-    pub focus_index: usize,
+    pub focus_number: f64,
     pub style: TextInputStyle,
     pub locked: bool,
     pub initial_text: String,
@@ -52,7 +52,7 @@ pub struct TextDisplayConfig {
     pub location: Location,
     pub width: usize,
     pub height: usize,
-    pub focus_index: usize,
+    pub focus_number: f64,
     pub style: FocusStyle,
     pub initial_text: String,
 }
@@ -72,7 +72,7 @@ pub type ButtonHandler = Box<dyn FnMut(&mut RuntimeUi) + 'static>;
 
 pub(super) struct ButtonElement {
     pub id: String,
-    pub focus_index: usize,
+    pub focus_number: f64,
     pub button: Button,
     pub style: FocusStyle,
     pub on_press: Option<ButtonHandler>,
@@ -80,7 +80,7 @@ pub(super) struct ButtonElement {
 
 pub(super) struct TextInputElement {
     pub id: String,
-    pub focus_index: usize,
+    pub focus_number: f64,
     pub location: Location,
     pub field: TextInputField,
     pub cursor: usize,
@@ -90,7 +90,7 @@ pub(super) struct TextInputElement {
 
 pub(super) struct TextDisplayRuntimeElement {
     pub id: String,
-    pub focus_index: usize,
+    pub focus_number: f64,
     pub location: Location,
     pub width: usize,
     pub height: usize,
@@ -128,14 +128,14 @@ impl ButtonElement {
             label,
             width,
             location,
-            focus_index,
+            focus_number,
             style,
             on_press,
         } = config;
 
         Self {
             id,
-            focus_index,
+            focus_number,
             button: create_button(
                 location,
                 label,
@@ -158,7 +158,7 @@ impl TextInputElement {
 
         Self {
             id: config.id,
-            focus_index: config.focus_index,
+            focus_number: config.focus_number,
             location: config.location,
             field,
             cursor: 0,
@@ -173,7 +173,7 @@ impl TextDisplayRuntimeElement {
         let (width, height) = clamp_text_display_dimensions(config.width, config.height);
         Self {
             id: config.id,
-            focus_index: config.focus_index,
+            focus_number: config.focus_number,
             location: config.location,
             width,
             height,
@@ -193,11 +193,19 @@ impl RuntimeElement {
         }
     }
 
-    pub fn focus_index(&self) -> usize {
+    pub fn focus_number(&self) -> f64 {
         match self {
-            RuntimeElement::Button(button) => button.focus_index,
-            RuntimeElement::TextInput(input) => input.focus_index,
-            RuntimeElement::TextDisplay(display) => display.focus_index,
+            RuntimeElement::Button(button) => button.focus_number,
+            RuntimeElement::TextInput(input) => input.focus_number,
+            RuntimeElement::TextDisplay(display) => display.focus_number,
+        }
+    }
+
+    pub fn set_focus_number(&mut self, focus_number: f64) {
+        match self {
+            RuntimeElement::Button(button) => button.focus_number = focus_number,
+            RuntimeElement::TextInput(input) => input.focus_number = focus_number,
+            RuntimeElement::TextDisplay(display) => display.focus_number = focus_number,
         }
     }
 

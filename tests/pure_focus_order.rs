@@ -3,10 +3,10 @@ use tersse::pure::focus_order::{next_index, normalize_index, prev_index, sorted_
 #[test]
 fn sorted_ids_uses_focus_then_id() {
     let sorted = sorted_ids(vec![
-        (2, "z".to_string()),
-        (0, "b".to_string()),
-        (0, "a".to_string()),
-        (1, "m".to_string()),
+        (2.0, "z".to_string()),
+        (0.0, "b".to_string()),
+        (0.0, "a".to_string()),
+        (1.0, "m".to_string()),
     ]);
     assert_eq!(sorted, vec!["a", "b", "m", "z"]);
 }

@@ -32,10 +32,7 @@ impl RuntimeUi {
     pub(super) fn screen_scroll_bounds(&self) -> (usize, usize) {
         let (max_y, _) = self.win.get_max_yx();
         let viewport_height = screen_scroll::screen_viewport_height(max_y);
-        let spans = self
-            .elements
-            .iter()
-            .map(|element| {
+        let spans = self.elements.iter().map(|element| {
                 let y = match element {
                     super::types::RuntimeElement::Button(button) => button.button.location.y,
                     super::types::RuntimeElement::TextInput(input) => input.location.y,

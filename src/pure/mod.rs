@@ -1,7 +1,9 @@
 //! Side-effect-free helpers (no I/O, no UI).
 
 pub mod button;
+pub mod focus_key;
 pub mod focus_order;
+pub mod focus_store;
 pub mod keyboard;
 pub mod layout_reflow;
 pub mod resize_debounce;

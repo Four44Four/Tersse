@@ -13,16 +13,13 @@ impl RuntimeUi {
         let Some(id) = self.current_focused_id() else {
             return false;
         };
-        let Some(idx) = self.idx_of(&id) else {
-            return false;
-        };
-        let Some(RuntimeElement::TextDisplay(_)) = self.elements.get(idx) else {
+        let Some(RuntimeElement::TextDisplay(_)) = self.element_by_id(&id) else {
             return false;
         };
 
         match key {
             TerminalKey::AltUp => {
-                let Some(RuntimeElement::TextDisplay(display)) = self.elements.get_mut(idx) else {
+                let Some(RuntimeElement::TextDisplay(display)) = self.element_mut_by_id(&id) else {
                     return false;
                 };
                 if display.scroll == 0 {
@@ -33,7 +30,7 @@ impl RuntimeUi {
             }
             TerminalKey::AltDown => {
                 let (total, scroll, viewport_rows) = {
-                    let RuntimeElement::TextDisplay(display) = &self.elements[idx] else {
+                    let Some(RuntimeElement::TextDisplay(display)) = self.element_by_id(&id) else {
                         return false;
                     };
                     let width = display.width.max(1);
@@ -50,7 +47,7 @@ impl RuntimeUi {
                     );
                     (total, scroll, viewport_h.max(1) as usize)
                 };
-                let Some(RuntimeElement::TextDisplay(display)) = self.elements.get_mut(idx) else {
+                let Some(RuntimeElement::TextDisplay(display)) = self.element_mut_by_id(&id) else {
                     return false;
                 };
                 display.scroll = scroll_view::scroll_line_down(scroll, total, viewport_rows);

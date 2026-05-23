@@ -19,11 +19,13 @@ impl RuntimeUi {
             self.draw_title(title.clone());
         }
 
-        for idx in 0..self.elements.len() {
-            match &self.elements[idx] {
-                RuntimeElement::Button(_) => self.draw_button(idx),
-                RuntimeElement::TextInput(_) => self.draw_text_input(idx),
-                RuntimeElement::TextDisplay(_) => self.draw_text_display(idx),
+        let draw_order: Vec<String> = self.elements.focus_order_ids();
+        for id in draw_order {
+            match self.elements.get(&id) {
+                Some(RuntimeElement::Button(_)) => self.draw_button(&id),
+                Some(RuntimeElement::TextInput(_)) => self.draw_text_input(&id),
+                Some(RuntimeElement::TextDisplay(_)) => self.draw_text_display(&id),
+                None => {}
             }
         }
 
@@ -50,9 +52,9 @@ impl RuntimeUi {
         self.win.attroff(COLOR_PAIR(pair as u64));
     }
 
-    fn draw_button(&mut self, idx: usize) {
-        let (location, text, width, style) = match &self.elements[idx] {
-            RuntimeElement::Button(button) => {
+    fn draw_button(&mut self, id: &str) {
+        let (location, text, width, style) = match self.elements.get(id) {
+            Some(RuntimeElement::Button(button)) => {
                 let style = if button.button.focused {
                     button.style.focused
                 } else {
@@ -74,8 +76,7 @@ impl RuntimeUi {
         if !terminal_bounds::row_is_visible(y, max_y) {
             return;
         }
-        let (_, draw_h) =
-            terminal_bounds::clip_rect(x, y, width.max(1) as i32, 1, max_x, max_y);
+        let (_, draw_h) = terminal_bounds::clip_rect(x, y, width.max(1) as i32, 1, max_x, max_y);
         if draw_h <= 0 {
             return;
         }
@@ -97,9 +98,9 @@ impl RuntimeUi {
         self.win.attroff(COLOR_PAIR(pair as u64));
     }
 
-    fn draw_text_input(&mut self, idx: usize) {
-        let (location, width, text, cursor, selection_anchor, style) = match &self.elements[idx] {
-            RuntimeElement::TextInput(input) => {
+    fn draw_text_input(&mut self, id: &str) {
+        let (location, width, text, cursor, selection_anchor, style) = match self.elements.get(id) {
+            Some(RuntimeElement::TextInput(input)) => {
                 let style = if input.field.locked {
                     if input.field.focused {
                         input.style.focused_locked
@@ -217,9 +218,9 @@ impl RuntimeUi {
         }
     }
 
-    fn draw_text_display(&mut self, idx: usize) {
-        let (location, width, height, text, scroll, style) = match &self.elements[idx] {
-            RuntimeElement::TextDisplay(display) => {
+    fn draw_text_display(&mut self, id: &str) {
+        let (location, width, height, text, scroll, style) = match self.elements.get(id) {
+            Some(RuntimeElement::TextDisplay(display)) => {
                 let style = if display.display.focused {
                     display.style.focused
                 } else {

@@ -47,7 +47,7 @@ impl RuntimeUi {
         if delta == 0 {
             return;
         }
-        for element in &mut self.elements {
+        for element in self.elements.iter_mut() {
             if element.id() == source_id {
                 continue;
             }
@@ -114,7 +114,11 @@ impl RuntimeUi {
 
     pub(super) fn refresh_height_cache(&mut self) {
         self.cached_heights.clear();
-        let ids: Vec<String> = self.elements.iter().map(|e| e.id().to_string()).collect();
+        let ids: Vec<String> = self
+            .elements
+            .iter()
+            .map(|e| e.id().to_string())
+            .collect();
         for id in ids {
             let height = match self.element_by_id(&id) {
                 Some(RuntimeElement::TextInput(_)) => {

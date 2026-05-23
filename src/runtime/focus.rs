@@ -23,12 +23,7 @@ impl RuntimeUi {
     }
 
     fn focus_order(&self) -> Vec<String> {
-        let entries = self
-            .elements
-            .iter()
-            .map(|element| (element.focus_index(), element.id().to_string()))
-            .collect::<Vec<_>>();
-        focus_order::sorted_ids(entries)
+        self.elements.focus_order_ids()
     }
 
     pub(super) fn current_focused_id(&self) -> Option<String> {
@@ -44,7 +39,7 @@ impl RuntimeUi {
 
     pub(super) fn sync_focus_flags(&mut self) {
         let focused = self.current_focused_id();
-        for element in &mut self.elements {
+        for element in self.elements.iter_mut() {
             let is_focused = focused.as_deref() == Some(element.id());
             match element {
                 RuntimeElement::Button(button) => button.button.focused = is_focused,

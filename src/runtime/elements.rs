@@ -9,13 +9,8 @@ use super::RuntimeUi;
 
 impl RuntimeUi {
     pub fn upsert_button(&mut self, config: ButtonConfig) {
-        let id = config.id.clone();
         let element = RuntimeElement::Button(ButtonElement::from_config(config));
-        if let Some(idx) = self.idx_of(&id) {
-            self.elements[idx] = element;
-        } else {
-            self.elements.push(element);
-        }
+        self.elements.upsert(element);
         self.sync_focus_position();
         self.refresh_height_cache();
     }
@@ -30,24 +25,15 @@ impl RuntimeUi {
     pub fn upsert_text_input(&mut self, config: TextInputConfig) {
         let id = config.id.clone();
         let element = RuntimeElement::TextInput(TextInputElement::from_config(config));
-        if let Some(idx) = self.idx_of(&id) {
-            self.elements[idx] = element;
-        } else {
-            self.elements.push(element);
-        }
+        self.elements.upsert(element);
         self.sync_focus_position();
         self.invalidate_text_input_layout_cache(&id);
         self.refresh_height_cache();
     }
 
     pub fn upsert_text_display(&mut self, config: TextDisplayConfig) {
-        let id = config.id.clone();
         let element = RuntimeElement::TextDisplay(TextDisplayRuntimeElement::from_config(config));
-        if let Some(idx) = self.idx_of(&id) {
-            self.elements[idx] = element;
-        } else {
-            self.elements.push(element);
-        }
+        self.elements.upsert(element);
         self.sync_focus_position();
         self.refresh_height_cache();
     }
@@ -102,8 +88,7 @@ impl RuntimeUi {
     }
 
     pub fn remove_element(&mut self, id: &str) -> bool {
-        if let Some(idx) = self.idx_of(id) {
-            self.elements.remove(idx);
+        if self.elements.remove(id).is_some() {
             self.sync_focus_position();
             self.cached_heights.remove(id);
             self.invalidate_text_input_layout_cache(id);
@@ -122,13 +107,8 @@ impl RuntimeUi {
         }
     }
 
-    pub fn set_focus_index(&mut self, id: &str, focus_index: usize) -> bool {
-        if let Some(element) = self.element_mut_by_id(id) {
-            match element {
-                RuntimeElement::Button(button) => button.focus_index = focus_index,
-                RuntimeElement::TextInput(input) => input.focus_index = focus_index,
-                RuntimeElement::TextDisplay(display) => display.focus_index = focus_index,
-            }
+    pub fn set_focus_number(&mut self, id: &str, focus_number: f64) -> bool {
+        if self.elements.set_focus_number(id, focus_number) {
             self.sync_focus_position();
             true
         } else {
@@ -200,15 +180,11 @@ impl RuntimeUi {
         }
     }
 
-    pub(super) fn idx_of(&self, id: &str) -> Option<usize> {
-        self.elements.iter().position(|element| element.id() == id)
-    }
-
     pub(super) fn element_by_id(&self, id: &str) -> Option<&RuntimeElement> {
-        self.idx_of(id).and_then(|idx| self.elements.get(idx))
+        self.elements.get(id)
     }
 
     pub(super) fn element_mut_by_id(&mut self, id: &str) -> Option<&mut RuntimeElement> {
-        self.idx_of(id).and_then(|idx| self.elements.get_mut(idx))
+        self.elements.get_mut(id)
     }
 }

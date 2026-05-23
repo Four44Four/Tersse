@@ -95,7 +95,7 @@ impl App {
                 x: clear_x as u16,
                 y: press_loc.y,
             },
-            focus_index: 4,
+            focus_number: 4.0,
             style: button_style(),
             on_press: Box::new(move |ui| {
                 let mut app = app_state.borrow_mut();
@@ -114,7 +114,7 @@ impl App {
                 },
                 width: DISPLAY_WIDTH,
                 height: RESULT_HEIGHT,
-                focus_index: 5,
+                focus_number: 5.0,
                 style: locked_like_style(),
                 initial_text: result,
             }));
@@ -146,7 +146,7 @@ impl App {
             location: Location { x: 0, y },
             width,
             height: 1,
-            focus_index: 99,
+            focus_number: 99.0,
             style: neutral_display_style(),
             initial_text: text.to_string(),
         }));
@@ -168,7 +168,7 @@ fn main() {
         label: "Foo".to_string(),
         width: FOO_BAR_BUTTON_WIDTH,
         location: Location { x: 0, y: 2 },
-        focus_index: 0,
+        focus_number: 0.0,
         style: button_style(),
         on_press: Box::new(move |ui| {
             let mut app = foo_app.borrow_mut();
@@ -181,7 +181,7 @@ fn main() {
         label: "Bar".to_string(),
         width: FOO_BAR_BUTTON_WIDTH,
         location: Location { x: 0, y: 3 },
-        focus_index: 1,
+        focus_number: 1.0,
         style: button_style(),
         on_press: Box::new(move |ui| {
             let mut app = bar_app.borrow_mut();
@@ -192,7 +192,7 @@ fn main() {
         id: INPUT_ID.to_string(),
         width: INPUT_WIDTH,
         location: Location { x: 0, y: 4 },
-        focus_index: 2,
+        focus_number: 2.0,
         style: text_input_style(),
         locked: false,
         initial_text: String::new(),
@@ -203,7 +203,7 @@ fn main() {
         label: PRESS_LABEL.to_string(),
         width: label_width(PRESS_LABEL),
         location: Location { x: 0, y: 5 },
-        focus_index: 3,
+        focus_number: 3.0,
         style: button_style(),
         on_press: Box::new(move |ui| {
             let mut app = press_app.borrow_mut();

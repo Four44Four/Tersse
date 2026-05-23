@@ -2,9 +2,12 @@
 
 pub mod clipboard;
 pub mod constants;
+pub mod element_store;
 pub mod pure;
 pub mod runtime;
 pub mod terminal_input;
+
+pub use element_store::{ElementStore, StoredElement};
 
 pub use constants::TERM_RESIZE_DEBOUNCE_MS;
 
@@ -86,23 +89,20 @@ pub enum Element {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum FocusError {
-    IndexOutOfBounds { index: usize, len: usize },
+    IdNotFound { id: String },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum DeleteElementError {
-    IndexOutOfBounds { index: usize, len: usize },
+    IdNotFound { id: String },
     NoFocusedElement,
 }
 
 impl Display for FocusError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            FocusError::IndexOutOfBounds { index, len } => {
-                write!(
-                    f,
-                    "cannot focus index {index}; there are only {len} element(s)"
-                )
+            FocusError::IdNotFound { id } => {
+                write!(f, "cannot focus element {id:?}; no element with that id exists")
             }
         }
     }
@@ -113,11 +113,8 @@ impl Error for FocusError {}
 impl Display for DeleteElementError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            DeleteElementError::IndexOutOfBounds { index, len } => {
-                write!(
-                    f,
-                    "cannot delete index {index}; there are only {len} element(s)"
-                )
+            DeleteElementError::IdNotFound { id } => {
+                write!(f, "cannot delete element {id:?}; no element with that id exists")
             }
             DeleteElementError::NoFocusedElement => {
                 write!(f, "cannot delete focused element; no element is focused")
@@ -184,114 +181,113 @@ pub fn create_text_display_element(initial_text: impl Into<String>) -> TextDispl
     }
 }
 
-/// Forces focus onto exactly one element by index.
-pub fn force_focus_on_element(elements: &mut [Element], index: usize) -> Result<(), FocusError> {
-    if index >= elements.len() {
-        return Err(FocusError::IndexOutOfBounds {
-            index,
-            len: elements.len(),
+/// Forces focus onto exactly one element by id.
+pub fn force_focus_on_element(store: &mut ElementStore, id: &str) -> Result<(), FocusError> {
+    if store.get(id).is_none() {
+        return Err(FocusError::IdNotFound {
+            id: id.to_string(),
         });
     }
-    for (i, element) in elements.iter_mut().enumerate() {
-        set_element_focus(element, i == index);
+    for stored in store.iter_mut() {
+        set_element_focus(&mut stored.element, stored.id == id);
     }
     Ok(())
 }
 
-/// Deletes a TUI element by index and returns the removed element.
+/// Deletes a TUI element by id and returns the removed entry.
 pub fn delete_tui_element(
-    elements: &mut Vec<Element>,
-    index: usize,
-) -> Result<Element, DeleteElementError> {
-    if index >= elements.len() {
-        return Err(DeleteElementError::IndexOutOfBounds {
-            index,
-            len: elements.len(),
-        });
-    }
-    Ok(elements.remove(index))
+    store: &mut ElementStore,
+    id: &str,
+) -> Result<StoredElement, DeleteElementError> {
+    store.remove(id).ok_or_else(|| DeleteElementError::IdNotFound {
+        id: id.to_string(),
+    })
 }
 
 /// Deletes the currently focused TUI element and returns it.
 pub fn delete_focused_tui_element(
-    elements: &mut Vec<Element>,
-) -> Result<Element, DeleteElementError> {
-    let Some(index) = elements.iter().position(element_is_focused) else {
+    store: &mut ElementStore,
+) -> Result<StoredElement, DeleteElementError> {
+    let focused_id = store
+        .iter()
+        .find(|stored| element_is_focused(&stored.element))
+        .map(|stored| stored.id.clone());
+    let Some(id) = focused_id else {
         return Err(DeleteElementError::NoFocusedElement);
     };
-    Ok(elements.remove(index))
+    store.remove(&id).ok_or(DeleteElementError::NoFocusedElement)
 }
 
 /// Changes background color of non-focused, non-locked text input field elements.
 pub fn change_bg_color_of_non_focused_non_locked_text_input_field_elements(
-    elements: &mut [Element],
+    store: &mut ElementStore,
     bg_color: Color,
 ) {
-    apply_color_to_matching_elements(elements, bg_color, Channel::Background, |field| {
+    apply_color_to_matching_elements(store, bg_color, Channel::Background, |field| {
         !field.focused && !field.locked
     });
 }
 
 /// Changes foreground color of non-focused, non-locked text input field elements.
 pub fn change_fg_color_of_non_focused_non_locked_text_input_field_elements(
-    elements: &mut [Element],
+    store: &mut ElementStore,
     fg_color: Color,
 ) {
-    apply_color_to_matching_elements(elements, fg_color, Channel::Foreground, |field| {
+    apply_color_to_matching_elements(store, fg_color, Channel::Foreground, |field| {
         !field.focused && !field.locked
     });
 }
 
 /// Changes background color of non-focused locked text input fields and text display elements.
 pub fn change_bg_color_of_non_focused_locked_text_input_field_elements_and_text_display_elements(
-    elements: &mut [Element],
+    store: &mut ElementStore,
     bg_color: Color,
 ) {
-    apply_color_to_locked_like_elements(elements, bg_color, Channel::Background, false);
+    apply_color_to_locked_like_elements(store, bg_color, Channel::Background, false);
 }
 
 /// Changes foreground color of non-focused locked text input fields and text display elements.
 pub fn change_fg_color_of_non_focused_locked_text_input_field_elements_and_text_display_elements(
-    elements: &mut [Element],
+    store: &mut ElementStore,
     fg_color: Color,
 ) {
-    apply_color_to_locked_like_elements(elements, fg_color, Channel::Foreground, false);
+    apply_color_to_locked_like_elements(store, fg_color, Channel::Foreground, false);
 }
 
 /// Changes background color of focused, non-locked text input field elements.
 pub fn change_bg_color_of_focused_non_locked_text_input_field_elements(
-    elements: &mut [Element],
+    store: &mut ElementStore,
     bg_color: Color,
 ) {
-    apply_color_to_matching_elements(elements, bg_color, Channel::Background, |field| {
+    apply_color_to_matching_elements(store, bg_color, Channel::Background, |field| {
         field.focused && !field.locked
     });
 }
 
 /// Changes foreground color of focused, non-locked text input field elements.
 pub fn change_fg_color_of_focused_non_locked_text_input_field_elements(
-    elements: &mut [Element],
+    store: &mut ElementStore,
     fg_color: Color,
 ) {
-    apply_color_to_matching_elements(elements, fg_color, Channel::Foreground, |field| {
+    apply_color_to_matching_elements(store, fg_color, Channel::Foreground, |field| {
         field.focused && !field.locked
     });
 }
 
 /// Changes background color of focused locked text input fields and text display elements.
 pub fn change_bg_color_of_focused_locked_text_input_field_elements_and_text_display_elements(
-    elements: &mut [Element],
+    store: &mut ElementStore,
     bg_color: Color,
 ) {
-    apply_color_to_locked_like_elements(elements, bg_color, Channel::Background, true);
+    apply_color_to_locked_like_elements(store, bg_color, Channel::Background, true);
 }
 
 /// Changes foreground color of focused locked text input fields and text display elements.
 pub fn change_fg_color_of_focused_locked_text_input_field_elements_and_text_display_elements(
-    elements: &mut [Element],
+    store: &mut ElementStore,
     fg_color: Color,
 ) {
-    apply_color_to_locked_like_elements(elements, fg_color, Channel::Foreground, true);
+    apply_color_to_locked_like_elements(store, fg_color, Channel::Foreground, true);
 }
 
 /// Updates text content of a text display element.
@@ -356,15 +352,15 @@ enum Channel {
 }
 
 fn apply_color_to_matching_elements<F>(
-    elements: &mut [Element],
+    store: &mut ElementStore,
     color: Color,
     channel: Channel,
     mut predicate: F,
 ) where
     F: FnMut(&TextInputField) -> bool,
 {
-    for element in elements {
-        if let Element::TextInputField(field) = element {
+    for stored in store.iter_mut() {
+        if let Element::TextInputField(field) = &mut stored.element {
             if predicate(field) {
                 set_color(channel, &mut field.bg_color, &mut field.fg_color, color);
             }
@@ -373,13 +369,13 @@ fn apply_color_to_matching_elements<F>(
 }
 
 fn apply_color_to_locked_like_elements(
-    elements: &mut [Element],
+    store: &mut ElementStore,
     color: Color,
     channel: Channel,
     focused: bool,
 ) {
-    for element in elements {
-        match element {
+    for stored in store.iter_mut() {
+        match &mut stored.element {
             Element::TextInputField(field) if field.locked && field.focused == focused => {
                 set_color(channel, &mut field.bg_color, &mut field.fg_color, color);
             }

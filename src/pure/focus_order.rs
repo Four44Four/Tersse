@@ -1,6 +1,6 @@
-/// Returns element ids sorted by `(focus_index, id)`.
-pub fn sorted_ids(mut entries: Vec<(usize, String)>) -> Vec<String> {
-    entries.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.cmp(&b.1)));
+/// Returns element ids sorted by `(focus_number, id)`.
+pub fn sorted_ids(mut entries: Vec<(f64, String)>) -> Vec<String> {
+    entries.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
     entries.into_iter().map(|(_, id)| id).collect()
 }
 
