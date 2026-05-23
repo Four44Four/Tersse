@@ -28,6 +28,7 @@ impl RuntimeUi {
             cached_heights: std::collections::HashMap::new(),
             resize_debounce_until: None,
             last_terminal_yx: None,
+            screen_scroll: 0,
         };
         let _ = ui.reload_screen_after_resize();
         ui
@@ -66,6 +67,10 @@ impl RuntimeUi {
     }
 
     fn handle_key(&mut self, key: TerminalKey) -> UiEvent {
+        if self.handle_screen_scroll(key) {
+            return UiEvent::None;
+        }
+
         if self.handle_display_scroll(key) {
             return UiEvent::None;
         }

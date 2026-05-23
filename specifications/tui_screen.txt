@@ -1,0 +1,4 @@
+ - Holding down Shift and Up/Down arrow keys will scroll entire screen up and down
+    - Will reveal clipped lines that are below terminal bottom
+    - Will clip topmost lines that are now above terminal top
+    - This works even in text input field

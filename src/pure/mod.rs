@@ -5,6 +5,7 @@ pub mod focus_order;
 pub mod keyboard;
 pub mod layout_reflow;
 pub mod resize_debounce;
+pub mod screen_scroll;
 pub mod scroll_view;
 pub mod terminal_bounds;
 pub mod text_input;

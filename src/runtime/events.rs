@@ -42,7 +42,7 @@ impl RuntimeUi {
                     let (max_y, max_x) = self.win.get_max_yx();
                     let (_, viewport_h) = terminal_bounds::clip_rect(
                         display.location.x as i32,
-                        display.location.y as i32,
+                        self.scrolled_y(display.location.y as i32),
                         width as i32,
                         display.height.max(1) as i32,
                         max_x,

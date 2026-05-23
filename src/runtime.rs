@@ -13,6 +13,7 @@ mod focus;
 mod layout;
 mod render;
 mod resize;
+mod screen_scroll;
 mod text_input_state;
 mod types;
 
@@ -61,4 +62,5 @@ pub struct RuntimeUi {
     cached_heights: HashMap<String, usize>,
     resize_debounce_until: Option<Instant>,
     last_terminal_yx: Option<(i32, i32)>,
+    screen_scroll: usize,
 }

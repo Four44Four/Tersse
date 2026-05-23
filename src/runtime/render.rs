@@ -11,6 +11,7 @@ use super::RuntimeUi;
 impl RuntimeUi {
     pub fn draw(&mut self) {
         self.auto_reflow_for_dynamic_heights();
+        self.clamp_screen_scroll_offset();
         self.sync_focus_flags();
         self.win.erase();
 
@@ -40,7 +41,11 @@ impl RuntimeUi {
             TitleAlignment::Center => ((max_x - text_len) / 2).max(0),
         };
         self.win.attron(COLOR_PAIR(pair as u64));
-        self.win.mv(0, col);
+        let title_y = self.scrolled_y(0);
+        if !terminal_bounds::row_is_visible(title_y, self.win.get_max_y()) {
+            return;
+        }
+        self.win.mv(title_y, col);
         self.win.addstr(&title.text);
         self.win.attroff(COLOR_PAIR(pair as u64));
     }
@@ -65,7 +70,7 @@ impl RuntimeUi {
 
         let (max_y, max_x) = self.win.get_max_yx();
         let x = location.x as i32;
-        let y = location.y as i32;
+        let y = self.scrolled_y(location.y as i32);
         if !terminal_bounds::row_is_visible(y, max_y) {
             return;
         }
@@ -122,15 +127,15 @@ impl RuntimeUi {
         let selection_pair = self.color_pair(style.1.fg, style.1.bg);
         let (max_y, max_x) = self.win.get_max_yx();
         let x = location.x as i32;
-        let y = location.y as i32;
+        let y = self.scrolled_y(location.y as i32);
         let rows = text_wrap::display_row_count(&text, width) as i32;
-        let (draw_w, draw_h) = terminal_bounds::clip_rect(x, y, width as i32, rows, max_x, max_y);
-        if draw_w <= 0 || draw_h <= 0 {
+        let draw_w = terminal_bounds::clip_rect(x, y, width as i32, 1, max_x, max_y).0;
+        if draw_w <= 0 || rows <= 0 {
             return;
         }
-        let draw_rows = draw_h as usize;
+        let logical_rows = rows as usize;
 
-        self.fill_solid(y, x, draw_w, draw_h, base_pair);
+        self.fill_solid_rows(y, x, draw_w, rows, base_pair);
 
         let state = TextInputState {
             text: text.clone(),
@@ -144,7 +149,7 @@ impl RuntimeUi {
         let mut drawn = std::collections::BTreeSet::new();
         for ch in text.chars() {
             let (line, col) = text_wrap::cursor_display_position(&text, char_idx, width);
-            if line >= draw_rows {
+            if line >= logical_rows {
                 char_idx += 1;
                 continue;
             }
@@ -180,7 +185,7 @@ impl RuntimeUi {
         }
 
         for (line, col) in highlight_cells {
-            if line >= draw_rows || drawn.contains(&(line, col)) {
+            if line >= logical_rows || drawn.contains(&(line, col)) {
                 continue;
             }
             let row_y = y + line as i32;
@@ -226,7 +231,7 @@ impl RuntimeUi {
 
         let (max_y, max_x) = self.win.get_max_yx();
         let x = location.x as i32;
-        let y = location.y as i32;
+        let y = self.scrolled_y(location.y as i32);
         let (draw_w, draw_h) =
             terminal_bounds::clip_rect(x, y, width as i32, height as i32, max_x, max_y);
         if draw_w <= 0 || draw_h <= 0 {
@@ -270,8 +275,19 @@ impl RuntimeUi {
         if w <= 0 || h <= 0 {
             return;
         }
+        self.fill_solid_rows(y, x, w, h, pair);
+    }
+
+    /// Fills a solid background across `logical_rows` rows, clipping width to the terminal
+    /// and skipping rows that are off-screen (including above the viewport when scrolled).
+    fn fill_solid_rows(&self, y: i32, x: i32, w: i32, logical_rows: i32, pair: i16) {
+        let (max_y, max_x) = self.win.get_max_yx();
+        let w = w.min(terminal_bounds::cols_visible_from(x, max_x)).max(0);
+        if w <= 0 || logical_rows <= 0 {
+            return;
+        }
         self.win.attron(COLOR_PAIR(pair as u64));
-        for row in 0..h {
+        for row in 0..logical_rows {
             let row_y = y + row;
             if !terminal_bounds::row_is_visible(row_y, max_y) {
                 continue;
@@ -309,13 +325,7 @@ impl RuntimeUi {
             text_wrap::cursor_display_position(&input.field.text, input.cursor, width);
         let (max_y, max_x) = self.win.get_max_yx();
         let x = input.location.x as i32;
-        let y = input.location.y as i32;
-        let rows = text_wrap::display_row_count(&input.field.text, width) as i32;
-        let (_, draw_h) = terminal_bounds::clip_rect(x, y, width as i32, rows, max_x, max_y);
-        if draw_h <= 0 || line >= draw_h as usize {
-            let _ = curs_set(0);
-            return;
-        }
+        let y = self.scrolled_y(input.location.y as i32);
         let row_y = y + line as i32;
         if !terminal_bounds::row_is_visible(row_y, max_y) {
             let _ = curs_set(0);

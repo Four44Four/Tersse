@@ -26,6 +26,8 @@ pub enum TerminalKey {
     },
     Up,
     Down,
+    ShiftUp,
+    ShiftDown,
     AltUp,
     AltDown,
     /// Ctrl+C — copy selection (text input fields only).
@@ -98,6 +100,8 @@ fn map_key_event(key: KeyEvent) -> Option<TerminalKey> {
         KeyCode::Right => Some(TerminalKey::Right {
             extend_selection: extend,
         }),
+        KeyCode::Up if key.modifiers.contains(KeyModifiers::SHIFT) => Some(TerminalKey::ShiftUp),
+        KeyCode::Down if key.modifiers.contains(KeyModifiers::SHIFT) => Some(TerminalKey::ShiftDown),
         KeyCode::Up if key.modifiers.contains(KeyModifiers::ALT) => Some(TerminalKey::AltUp),
         KeyCode::Down if key.modifiers.contains(KeyModifiers::ALT) => Some(TerminalKey::AltDown),
         KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {

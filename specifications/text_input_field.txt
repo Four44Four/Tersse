@@ -55,7 +55,3 @@
     - Move all text in current line to start of next line
  - When a newline character is selected:
     - Draw visual selection indicator from the position of the newline character to the end of the current line
- - When text input reaches the bottom of the terminal:
-    - Do not allow any more characters to be entered
-    - If multiple characters are pasted in:
-       - Cut off the pasted text where it would trigger the text input field expanding past the bottom of the terminal

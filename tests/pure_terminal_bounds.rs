@@ -17,6 +17,13 @@ fn clip_height_truncates_tall_element_to_terminal_bottom() {
 }
 
 #[test]
+fn clip_height_for_anchor_above_viewport() {
+    assert_eq!(rows_visible_from(-3, 23), 23);
+    assert_eq!(clip_height_at_terminal(-3, 10, 23), 10);
+    assert_eq!(clip_height_at_terminal(-3, 30, 23), 23);
+}
+
+#[test]
 fn clip_rect_at_bottom_right() {
     assert_eq!(clip_rect(0, 20, 80, 12, 79, 23), (80, 3));
     assert_eq!(clip_rect(70, 22, 20, 5, 79, 23), (10, 1));

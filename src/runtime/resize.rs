@@ -50,6 +50,7 @@ impl RuntimeUi {
         self.last_terminal_yx = Some((max_y, max_x));
         if changed {
             self.refresh_height_cache();
+            self.clamp_screen_scroll_offset();
         }
         changed
     }

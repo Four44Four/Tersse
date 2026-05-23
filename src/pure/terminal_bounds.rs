@@ -15,10 +15,15 @@ pub fn cols_visible_from(x: i32, max_x: i32) -> i32 {
 }
 
 /// Rows visible from `y` through the usable bottom row (`terminal_max_y` minus one).
+///
+/// When `y` is above the viewport (negative), returns the number of usable rows from
+/// terminal row 0 downward so partially scrolled content can be clipped correctly.
 pub fn rows_visible_from(y: i32, terminal_max_y: i32) -> i32 {
     let max_y = content_max_y(terminal_max_y);
     if y > max_y {
         0
+    } else if y < 0 {
+        max_y + 1
     } else {
         max_y - y + 1
     }
