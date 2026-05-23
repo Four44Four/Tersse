@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use pancurses::{curs_set, endwin, initscr, noecho};
 
+use crate::constants::POLL_TIMEOUT_MS;
 use crate::terminal_input;
 use crate::terminal_input::{TerminalKey, TerminalPoll};
 use crate::ScreenTitle;
@@ -45,11 +46,21 @@ impl RuntimeUi {
         self.title = None;
     }
 
-    /// Draw one frame and process one input event.
-    ///
-    /// Returns `false` when the runtime receives a quit key.
-    pub fn run_frame(&mut self, timeout: Duration) -> bool {
-        let quit = matches!(self.poll_event(timeout), UiEvent::Quit);
+    /// Runs the UI event loop until the user quits.
+    pub fn run(&mut self) {
+        while self.step() {}
+    }
+
+    /// Advances one frame. Returns `false` when the user quits.
+    pub fn step(&mut self) -> bool {
+        self.run_frame()
+    }
+
+    fn run_frame(&mut self) -> bool {
+        let quit = matches!(
+            self.poll_event(Duration::from_millis(POLL_TIMEOUT_MS)),
+            UiEvent::Quit
+        );
         let _ = self.tick_resize_debounce();
         if !self.is_resize_debounce_active() {
             self.draw();
@@ -57,7 +68,7 @@ impl RuntimeUi {
         !quit
     }
 
-    pub fn poll_event(&mut self, timeout: Duration) -> UiEvent {
+    fn poll_event(&mut self, timeout: Duration) -> UiEvent {
         match terminal_input::poll_terminal(timeout) {
             Ok(Some(TerminalPoll::Resized { .. })) => {
                 self.note_terminal_resize();

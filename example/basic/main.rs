@@ -1,13 +1,15 @@
+mod flash;
 mod style;
 
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
+
+use tokio::task::AbortHandle;
 use tersse::prelude::*;
 
 use style::{button_style, locked_like_style, screen_title, text_input_style};
 
-const POLL_TIMEOUT_MS: u64 = 50;
 const FLASH_FOO: Duration = Duration::from_secs(2);
 const FLASH_BAR: Duration = Duration::from_secs(5);
 const FOO_BAR_BUTTON_WIDTH: usize = 5;
@@ -16,11 +18,6 @@ const PRESS_LABEL: &str = "Press Me !!";
 const CLEAR_LABEL: &str = "Clear Result";
 const DISPLAY_WIDTH: usize = 80;
 const RESULT_HEIGHT: usize = 12;
-
-#[derive(Clone, Copy)]
-struct FlashMessage {
-    expires_at: Instant,
-}
 
 struct App {
     foo_id: ElementId,
@@ -31,8 +28,8 @@ struct App {
     result_id: Option<ElementId>,
     foo_text_id: Option<ElementId>,
     bar_text_id: Option<ElementId>,
-    foo_flash: Option<FlashMessage>,
-    bar_flash: Option<FlashMessage>,
+    foo_flash: Option<AbortHandle>,
+    bar_flash: Option<AbortHandle>,
     result_visible: bool,
 }
 
@@ -53,45 +50,32 @@ impl App {
         }
     }
 
-    fn tick(&mut self, ui: &mut RuntimeUi) {
-        if Self::message_expired(self.foo_flash) {
-            self.foo_flash = None;
-            if let Some(id) = self.foo_text_id.take() {
-                let _ = ui.remove_and_reflow(id);
-            }
-        }
-        if Self::message_expired(self.bar_flash) {
-            self.bar_flash = None;
-            if let Some(id) = self.bar_text_id.take() {
-                let _ = ui.remove_and_reflow(id);
-            }
-        }
+    fn handle_foo(
+        &mut self,
+        ui: &mut RuntimeUi,
+        ui_cell: &Rc<RefCell<RuntimeUi>>,
+        app: &Rc<RefCell<Option<App>>>,
+    ) {
+        let id = self.upsert_flash_display(ui, self.foo_id, self.foo_text_id, 0.5, "Button 1");
+        self.foo_text_id = Some(id);
+        flash::arm(ui_cell, &mut self.foo_flash, id, FLASH_FOO, {
+            let app = Rc::clone(app);
+            move || app.borrow_mut().as_mut().unwrap().foo_text_id = None
+        });
     }
 
-    fn handle_foo(&mut self, ui: &mut RuntimeUi) {
-        self.foo_flash = Some(FlashMessage {
-            expires_at: Instant::now() + FLASH_FOO,
+    fn handle_bar(
+        &mut self,
+        ui: &mut RuntimeUi,
+        ui_cell: &Rc<RefCell<RuntimeUi>>,
+        app: &Rc<RefCell<Option<App>>>,
+    ) {
+        let id = self.upsert_flash_display(ui, self.bar_id, self.bar_text_id, 1.5, "Button 2");
+        self.bar_text_id = Some(id);
+        flash::arm(ui_cell, &mut self.bar_flash, id, FLASH_BAR, {
+            let app = Rc::clone(app);
+            move || app.borrow_mut().as_mut().unwrap().bar_text_id = None
         });
-        self.foo_text_id = Some(self.upsert_flash_display(
-            ui,
-            self.foo_id,
-            self.foo_text_id,
-            0.5,
-            "Button 1",
-        ));
-    }
-
-    fn handle_bar(&mut self, ui: &mut RuntimeUi) {
-        self.bar_flash = Some(FlashMessage {
-            expires_at: Instant::now() + FLASH_BAR,
-        });
-        self.bar_text_id = Some(self.upsert_flash_display(
-            ui,
-            self.bar_id,
-            self.bar_text_id,
-            1.5,
-            "Button 2",
-        ));
     }
 
     fn handle_press(&mut self, ui: &mut RuntimeUi, app_state: Rc<RefCell<Option<App>>>) {
@@ -185,80 +169,92 @@ impl App {
             ui.create_text_display(config)
         }
     }
-
-    fn message_expired(message: Option<FlashMessage>) -> bool {
-        matches!(message, Some(msg) if Instant::now() >= msg.expires_at)
-    }
 }
 
-fn main() {
-    let mut ui = RuntimeUi::new();
-    ui.set_title(screen_title());
+#[tokio::main(flavor = "current_thread")]
+async fn main() {
+    tokio::task::LocalSet::new()
+        .run_until(async {
+            let ui_cell = Rc::new(RefCell::new(RuntimeUi::new()));
+            let app: Rc<RefCell<Option<App>>> = Rc::new(RefCell::new(None));
 
-    let app: Rc<RefCell<Option<App>>> = Rc::new(RefCell::new(None));
+            let (foo_id, bar_id, input_id, press_id) = {
+                let mut ui = ui_cell.borrow_mut();
+                ui.set_title(screen_title());
 
-    let foo_app = Rc::clone(&app);
-    let foo_id = ui.create_button(ButtonConfig {
-        label: "Foo".to_string(),
-        width: FOO_BAR_BUTTON_WIDTH,
-        placement: ElementPlacement::absolute(Location { x: 0, y: 2 }),
-        focus_number: 0.0,
-        style: button_style(),
-        on_press: Box::new(move |ui| {
-            foo_app.borrow_mut().as_mut().unwrap().handle_foo(ui);
-        }),
-    });
+                let foo_app = Rc::clone(&app);
+                let foo_ui = Rc::clone(&ui_cell);
+                let foo_id = ui.create_button(ButtonConfig {
+                    label: "Foo".to_string(),
+                    width: FOO_BAR_BUTTON_WIDTH,
+                    placement: ElementPlacement::absolute(Location { x: 0, y: 2 }),
+                    focus_number: 0.0,
+                    style: button_style(),
+                    on_press: Box::new(move |ui| {
+                        foo_app
+                            .borrow_mut()
+                            .as_mut()
+                            .unwrap()
+                            .handle_foo(ui, &foo_ui, &foo_app);
+                    }),
+                });
 
-    let bar_app = Rc::clone(&app);
-    let bar_id = ui.create_button(ButtonConfig {
-        label: "Bar".to_string(),
-        width: FOO_BAR_BUTTON_WIDTH,
-        placement: ElementPlacement::absolute(Location { x: 0, y: 3 }),
-        focus_number: 1.0,
-        style: button_style(),
-        on_press: Box::new(move |ui| {
-            bar_app.borrow_mut().as_mut().unwrap().handle_bar(ui);
-        }),
-    });
+                let bar_app = Rc::clone(&app);
+                let bar_ui = Rc::clone(&ui_cell);
+                let bar_id = ui.create_button(ButtonConfig {
+                    label: "Bar".to_string(),
+                    width: FOO_BAR_BUTTON_WIDTH,
+                    placement: ElementPlacement::absolute(Location { x: 0, y: 3 }),
+                    focus_number: 1.0,
+                    style: button_style(),
+                    on_press: Box::new(move |ui| {
+                        bar_app
+                            .borrow_mut()
+                            .as_mut()
+                            .unwrap()
+                            .handle_bar(ui, &bar_ui, &bar_app);
+                    }),
+                });
 
-    let input_id = ui.create_text_input(TextInputConfig {
-        width: INPUT_WIDTH,
-        placement: ElementPlacement::absolute(Location { x: 0, y: 4 }),
-        focus_number: 2.0,
-        style: text_input_style(),
-        locked: false,
-        initial_text: String::new(),
-    });
+                let input_id = ui.create_text_input(TextInputConfig {
+                    width: INPUT_WIDTH,
+                    placement: ElementPlacement::absolute(Location { x: 0, y: 4 }),
+                    focus_number: 2.0,
+                    style: text_input_style(),
+                    locked: false,
+                    initial_text: String::new(),
+                });
 
-    let press_app = Rc::clone(&app);
-    let press_id = ui.create_button(ButtonConfig {
-        label: PRESS_LABEL.to_string(),
-        width: PRESS_LABEL.chars().count().max(1),
-        placement: ElementPlacement::relative_to(input_id, ParentSide::Bottom, Location::default()),
-        focus_number: 3.0,
-        style: button_style(),
-        on_press: Box::new(move |ui| {
-            press_app
-                .borrow_mut()
-                .as_mut()
-                .unwrap()
-                .handle_press(ui, Rc::clone(&press_app));
-        }),
-    });
+                let press_app = Rc::clone(&app);
+                let press_id = ui.create_button(ButtonConfig {
+                    label: PRESS_LABEL.to_string(),
+                    width: PRESS_LABEL.chars().count().max(1),
+                    placement: ElementPlacement::relative_to(
+                        input_id,
+                        ParentSide::Bottom,
+                        Location::default(),
+                    ),
+                    focus_number: 3.0,
+                    style: button_style(),
+                    on_press: Box::new(move |ui| {
+                        press_app
+                            .borrow_mut()
+                            .as_mut()
+                            .unwrap()
+                            .handle_press(ui, Rc::clone(&press_app));
+                    }),
+                });
 
-    *app.borrow_mut() = Some(App::new(foo_id, bar_id, input_id, press_id));
+                (foo_id, bar_id, input_id, press_id)
+            };
 
-    loop {
-        {
-            let mut slot = app.borrow_mut();
-            if let Some(app) = slot.as_mut() {
-                app.tick(&mut ui);
+            *app.borrow_mut() = Some(App::new(foo_id, bar_id, input_id, press_id));
+
+            while ui_cell.borrow_mut().step() {
+                tokio::task::yield_now().await;
             }
-        }
-        if !ui.run_frame(Duration::from_millis(POLL_TIMEOUT_MS)) {
-            break;
-        }
-    }
+        })
+        .await;
 }
 
 fn build_result_text(input: &str) -> String {

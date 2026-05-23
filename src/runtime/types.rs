@@ -60,7 +60,7 @@ pub enum ElementConfig {
     TextDisplay(TextDisplayConfig),
 }
 
-pub enum UiEvent {
+pub(super) enum UiEvent {
     None,
     Quit,
 }

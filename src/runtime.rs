@@ -21,7 +21,7 @@ mod types;
 
 pub use types::{
     ButtonConfig, ButtonHandler, ElementConfig, FocusStyle, Style, TextDisplayConfig,
-    TextInputConfig, TextInputStyle, UiEvent,
+    TextInputConfig, TextInputStyle,
 };
 
 use element_store::ElementStore;

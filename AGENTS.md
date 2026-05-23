@@ -8,3 +8,4 @@
     - Whenever pure functionality logic changes:
        - Modify existing test targetting that functionality or create a new unit test in ./tests
  - Refer to files in directory ./specifications for technical specifications on components and features 
+ - Do not add any features that allow for scheduling based on UI event loop
