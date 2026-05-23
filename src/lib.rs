@@ -3,6 +3,7 @@
 pub mod pure;
 pub mod clipboard;
 pub mod terminal_input;
+pub mod runtime;
 
 use std::error::Error;
 use std::fmt::{Display, Formatter};
@@ -31,7 +32,7 @@ pub type ButtonCallback = Box<dyn FnMut() + Send + 'static>;
 pub struct Button {
     pub location: Location,
     pub display_string: String,
-    pub max_width: usize,
+    pub width: usize,
     pub bg_color: Color,
     pub fg_color: Color,
     pub focused: bool,
@@ -121,20 +122,23 @@ impl Display for DeleteElementError {
 
 impl Error for DeleteElementError {}
 
-/// Creates a button with location, display string, width, colors, and callback.
+/// Creates a button with location, display string, fixed width, colors, and callback.
+///
+/// The label is truncated to `width`. Shorter labels are padded with spaces at draw time.
 pub fn create_button(
     location: Location,
     display_string: impl Into<String>,
-    max_width: usize,
+    width: usize,
     bg_color: Color,
     fg_color: Color,
     callback_action: ButtonCallback,
 ) -> Button {
-    let display_string = truncate_to_width(display_string.into(), max_width);
+    let width = width.max(1);
+    let display_string = crate::pure::button::truncate_label(&display_string.into(), width);
     Button {
         location,
         display_string,
-        max_width,
+        width,
         bg_color,
         fg_color,
         focused: false,
@@ -305,10 +309,6 @@ pub fn set_title_of_current_screen(
         fg_color,
         bg_color,
     }
-}
-
-fn truncate_to_width(value: String, max_width: usize) -> String {
-    value.chars().take(max_width).collect()
 }
 
 fn default_non_focused_non_locked_bg_color() -> Color {
