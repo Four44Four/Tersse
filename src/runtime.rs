@@ -12,6 +12,7 @@ mod elements;
 mod events;
 mod focus;
 mod layout;
+mod placement;
 mod render;
 mod resize;
 mod screen_scroll;
@@ -22,6 +23,8 @@ pub use types::{
     ButtonConfig, ButtonHandler, ElementConfig, FocusStyle, Style, TextDisplayConfig,
     TextInputConfig, TextInputStyle, UiEvent,
 };
+
+pub use crate::{ElementPlacement, ParentSide};
 
 use element_store::ElementStore;
 

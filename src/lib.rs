@@ -10,6 +10,7 @@ pub mod terminal_input;
 pub use element_store::{ElementStore, StoredElement};
 
 pub use constants::TERM_RESIZE_DEBOUNCE_MS;
+pub use pure::element_placement::{ElementBounds, ElementPlacement, ParentSide};
 
 use std::error::Error;
 use std::fmt::{Display, Formatter};

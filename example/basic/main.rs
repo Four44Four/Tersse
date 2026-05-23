@@ -3,8 +3,8 @@ mod style;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
-use tersse::runtime::{ButtonConfig, ElementConfig, RuntimeUi, TextDisplayConfig, TextInputConfig};
-use tersse::Location;
+use tersse::runtime::{ButtonConfig, RuntimeUi, TextDisplayConfig, TextInputConfig};
+use tersse::{ElementPlacement, Location, ParentSide};
 
 use style::{button_style, locked_like_style, screen_title, text_input_style};
 
@@ -77,22 +77,20 @@ impl App {
         let result = build_result_text(&input);
         let _ = ui.set_text_input_lock_status(INPUT_ID, true);
 
-        let press_loc = ui
-            .element_location(PRESS_ID)
-            .unwrap_or(Location { x: 0, y: 5 });
-        let press_width = ui
-            .button_width(PRESS_ID)
-            .unwrap_or(label_width(PRESS_LABEL));
-        let clear_x = press_loc.x as usize + press_width + 1;
+        let clear_x = label_width(PRESS_LABEL) + 1;
 
         ui.upsert_button(ButtonConfig {
             id: CLEAR_ID.to_string(),
             label: CLEAR_LABEL.to_string(),
             width: label_width(CLEAR_LABEL),
-            location: Location {
-                x: clear_x as u16,
-                y: press_loc.y,
-            },
+            placement: ElementPlacement::relative_to(
+                INPUT_ID,
+                ParentSide::Bottom,
+                Location {
+                    x: clear_x as u16,
+                    y: 0,
+                },
+            ),
             focus_number: 4.0,
             style: button_style(),
             on_press: Box::new(move |ui| {
@@ -104,18 +102,19 @@ impl App {
         if self.result_visible {
             let _ = ui.set_text_display_text(RESULT_ID, result);
         } else {
-            ui.upsert_and_reflow(ElementConfig::TextDisplay(TextDisplayConfig {
+            ui.upsert_text_display(TextDisplayConfig {
                 id: RESULT_ID.to_string(),
-                location: Location {
-                    x: 0,
-                    y: press_loc.y.saturating_add(1),
-                },
+                placement: ElementPlacement::relative_to(
+                    PRESS_ID,
+                    ParentSide::Bottom,
+                    Location::default(),
+                ),
                 width: DISPLAY_WIDTH,
                 height: RESULT_HEIGHT,
                 focus_number: 5.0,
                 style: locked_like_style(),
                 initial_text: result,
-            }));
+            });
             self.result_visible = true;
         }
     }
@@ -135,20 +134,16 @@ impl App {
         focus_number: f64,
         text: &str,
     ) {
-        let y = ui
-            .element_location(button_id)
-            .map(|loc| loc.y.saturating_add(1))
-            .unwrap_or(3);
         let width = text.chars().count().max(1);
-        ui.upsert_and_reflow(ElementConfig::TextDisplay(TextDisplayConfig {
+        ui.upsert_text_display(TextDisplayConfig {
             id: display_id.to_string(),
-            location: Location { x: 0, y },
+            placement: ElementPlacement::relative_to(button_id, ParentSide::Bottom, Location::default()),
             width,
             height: 1,
             focus_number,
             style: locked_like_style(),
             initial_text: text.to_string(),
-        }));
+        });
     }
 
     fn message_expired(message: Option<FlashMessage>) -> bool {
@@ -166,7 +161,7 @@ fn main() {
         id: FOO_ID.to_string(),
         label: "Foo".to_string(),
         width: FOO_BAR_BUTTON_WIDTH,
-        location: Location { x: 0, y: 2 },
+        placement: ElementPlacement::absolute(Location { x: 0, y: 2 }),
         focus_number: 0.0,
         style: button_style(),
         on_press: Box::new(move |ui| {
@@ -179,7 +174,7 @@ fn main() {
         id: BAR_ID.to_string(),
         label: "Bar".to_string(),
         width: FOO_BAR_BUTTON_WIDTH,
-        location: Location { x: 0, y: 3 },
+        placement: ElementPlacement::absolute(Location { x: 0, y: 3 }),
         focus_number: 1.0,
         style: button_style(),
         on_press: Box::new(move |ui| {
@@ -190,7 +185,7 @@ fn main() {
     ui.upsert_text_input(TextInputConfig {
         id: INPUT_ID.to_string(),
         width: INPUT_WIDTH,
-        location: Location { x: 0, y: 4 },
+        placement: ElementPlacement::absolute(Location { x: 0, y: 4 }),
         focus_number: 2.0,
         style: text_input_style(),
         locked: false,
@@ -201,7 +196,7 @@ fn main() {
         id: PRESS_ID.to_string(),
         label: PRESS_LABEL.to_string(),
         width: label_width(PRESS_LABEL),
-        location: Location { x: 0, y: 5 },
+        placement: ElementPlacement::relative_to(INPUT_ID, ParentSide::Bottom, Location::default()),
         focus_number: 3.0,
         style: button_style(),
         on_press: Box::new(move |ui| {

@@ -1,7 +1,7 @@
 use crate::pure::text_input::TextInputState;
 use crate::{
     create_button, create_text_display_element, create_text_input_field_element, Button, Color,
-    Location, TextDisplayElement, TextInputField,
+    ElementPlacement, Location, TextDisplayElement, TextInputField,
 };
 
 use super::RuntimeUi;
@@ -31,7 +31,7 @@ pub struct ButtonConfig {
     pub id: String,
     pub label: String,
     pub width: usize,
-    pub location: Location,
+    pub placement: ElementPlacement,
     pub focus_number: f64,
     pub style: FocusStyle,
     pub on_press: ButtonHandler,
@@ -40,7 +40,7 @@ pub struct ButtonConfig {
 pub struct TextInputConfig {
     pub id: String,
     pub width: usize,
-    pub location: Location,
+    pub placement: ElementPlacement,
     pub focus_number: f64,
     pub style: TextInputStyle,
     pub locked: bool,
@@ -49,7 +49,7 @@ pub struct TextInputConfig {
 
 pub struct TextDisplayConfig {
     pub id: String,
-    pub location: Location,
+    pub placement: ElementPlacement,
     pub width: usize,
     pub height: usize,
     pub focus_number: f64,
@@ -73,6 +73,7 @@ pub type ButtonHandler = Box<dyn FnMut(&mut RuntimeUi) + 'static>;
 pub(super) struct ButtonElement {
     pub id: String,
     pub focus_number: f64,
+    pub placement: ElementPlacement,
     pub button: Button,
     pub style: FocusStyle,
     pub on_press: Option<ButtonHandler>,
@@ -81,6 +82,7 @@ pub(super) struct ButtonElement {
 pub(super) struct TextInputElement {
     pub id: String,
     pub focus_number: f64,
+    pub placement: ElementPlacement,
     pub location: Location,
     pub field: TextInputField,
     pub cursor: usize,
@@ -91,6 +93,7 @@ pub(super) struct TextInputElement {
 pub(super) struct TextDisplayRuntimeElement {
     pub id: String,
     pub focus_number: f64,
+    pub placement: ElementPlacement,
     pub location: Location,
     pub width: usize,
     pub height: usize,
@@ -122,12 +125,12 @@ pub(crate) fn text_input_state_from_parts(
 }
 
 impl ButtonElement {
-    pub fn from_config(config: ButtonConfig) -> Self {
+    pub fn from_config(config: ButtonConfig, location: Location) -> Self {
         let ButtonConfig {
             id,
             label,
             width,
-            location,
+            placement,
             focus_number,
             style,
             on_press,
@@ -136,6 +139,7 @@ impl ButtonElement {
         Self {
             id,
             focus_number,
+            placement,
             button: create_button(
                 location,
                 label,
@@ -151,7 +155,7 @@ impl ButtonElement {
 }
 
 impl TextInputElement {
-    pub fn from_config(config: TextInputConfig) -> Self {
+    pub fn from_config(config: TextInputConfig, location: Location) -> Self {
         let mut field = create_text_input_field_element(config.width);
         field.locked = config.locked;
         field.text = config.initial_text;
@@ -159,7 +163,8 @@ impl TextInputElement {
         Self {
             id: config.id,
             focus_number: config.focus_number,
-            location: config.location,
+            placement: config.placement,
+            location,
             field,
             cursor: 0,
             selection_anchor: None,
@@ -169,12 +174,13 @@ impl TextInputElement {
 }
 
 impl TextDisplayRuntimeElement {
-    pub fn from_config(config: TextDisplayConfig) -> Self {
+    pub fn from_config(config: TextDisplayConfig, location: Location) -> Self {
         let (width, height) = clamp_text_display_dimensions(config.width, config.height);
         Self {
             id: config.id,
             focus_number: config.focus_number,
-            location: config.location,
+            placement: config.placement,
+            location,
             width,
             height,
             scroll: 0,

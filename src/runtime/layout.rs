@@ -27,6 +27,7 @@ impl RuntimeUi {
             })
             .collect::<Vec<_>>();
 
+        let mut relayout = false;
         for id in text_input_ids {
             let old_height = self.cached_heights.get(&id).copied().unwrap_or(1);
             let new_height = self.text_input_render_height(&id).unwrap_or(old_height);
@@ -34,41 +35,19 @@ impl RuntimeUi {
             if delta == 0 {
                 continue;
             }
-            if let Some(location) = self.element_location(&id) {
-                let min_y = layout_reflow::min_y_after_change(location.y, old_height);
-                self.shift_elements_from_min_y(&id, min_y, delta);
+            if delta > 0 {
+                if let Some(location) = self.element_location(&id) {
+                    let min_y = layout_reflow::min_y_after_change(location.y, old_height);
+                    self.push_elements_down_from(min_y, delta, &[id.as_str()]);
+                }
+            } else {
+                relayout = true;
             }
+        }
+        if relayout {
+            self.relayout_all_from_placements();
         }
         self.refresh_height_cache();
-    }
-
-    /// Shifts every element at `y >= min_y` (except `source_id`) by `delta` rows.
-    pub(super) fn shift_elements_from_min_y(&mut self, source_id: &str, min_y: u16, delta: i32) {
-        if delta == 0 {
-            return;
-        }
-        for element in self.elements.iter_mut() {
-            if element.id() == source_id {
-                continue;
-            }
-
-            let current_y = match element {
-                RuntimeElement::Button(button) => button.button.location.y,
-                RuntimeElement::TextInput(input) => input.location.y,
-                RuntimeElement::TextDisplay(display) => display.location.y,
-            };
-            let shifted_y = layout_reflow::shifted_y(current_y, min_y, delta);
-            match element {
-                RuntimeElement::Button(button) => button.button.location.y = shifted_y,
-                RuntimeElement::TextInput(input) => input.location.y = shifted_y,
-                RuntimeElement::TextDisplay(display) => display.location.y = shifted_y,
-            }
-        }
-    }
-
-    pub(super) fn element_render_height_by_id(&self, id: &str) -> Option<usize> {
-        self.element_by_id(id)
-            .map(|element| self.element_render_height(element))
     }
 
     /// Logical row span used for reflow (content height, not viewport-clipped height).

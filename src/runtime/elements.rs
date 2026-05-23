@@ -10,8 +10,11 @@ use super::RuntimeUi;
 impl RuntimeUi {
     pub fn upsert_button(&mut self, config: ButtonConfig) {
         let focused_id = self.current_focused_id();
-        let element = RuntimeElement::Button(ButtonElement::from_config(config));
+        let (width, height) = Self::button_config_dimensions(&config);
+        let location = self.resolve_config_location(&config.id, &config.placement, width, height);
+        let element = RuntimeElement::Button(ButtonElement::from_config(config, location));
         self.elements.upsert(element);
+        self.recompute_all_relative_locations();
         self.restore_focus(focused_id);
         self.refresh_height_cache();
     }
@@ -26,8 +29,11 @@ impl RuntimeUi {
     pub fn upsert_text_input(&mut self, config: TextInputConfig) {
         let focused_id = self.current_focused_id();
         let id = config.id.clone();
-        let element = RuntimeElement::TextInput(TextInputElement::from_config(config));
+        let (width, height) = Self::text_input_config_dimensions(&config);
+        let location = self.resolve_config_location(&id, &config.placement, width, height);
+        let element = RuntimeElement::TextInput(TextInputElement::from_config(config, location));
         self.elements.upsert(element);
+        self.recompute_all_relative_locations();
         self.restore_focus(focused_id);
         self.invalidate_text_input_layout_cache(&id);
         self.refresh_height_cache();
@@ -35,56 +41,36 @@ impl RuntimeUi {
 
     pub fn upsert_text_display(&mut self, config: TextDisplayConfig) {
         let focused_id = self.current_focused_id();
-        let element = RuntimeElement::TextDisplay(TextDisplayRuntimeElement::from_config(config));
+        let (width, height) = Self::text_display_config_dimensions(&config);
+        let location = self.resolve_config_location(&config.id, &config.placement, width, height);
+        let element = RuntimeElement::TextDisplay(TextDisplayRuntimeElement::from_config(
+            config, location,
+        ));
         self.elements.upsert(element);
+        self.recompute_all_relative_locations();
         self.restore_focus(focused_id);
         self.refresh_height_cache();
     }
 
     pub fn upsert_and_reflow(&mut self, config: ElementConfig) {
-        let id = match &config {
-            ElementConfig::Button(cfg) => cfg.id.clone(),
-            ElementConfig::TextInput(cfg) => cfg.id.clone(),
-            ElementConfig::TextDisplay(cfg) => cfg.id.clone(),
-        };
-        let old_height = self.element_render_height_by_id(&id).unwrap_or(0);
-        let anchor_y = self
-            .element_location(&id)
-            .map(|loc| loc.y)
-            .or_else(|| match &config {
-                ElementConfig::Button(cfg) => Some(cfg.location.y),
-                ElementConfig::TextInput(cfg) => Some(cfg.location.y),
-                ElementConfig::TextDisplay(cfg) => Some(cfg.location.y),
-            });
-
         match config {
             ElementConfig::Button(cfg) => self.upsert_button(cfg),
             ElementConfig::TextInput(cfg) => self.upsert_text_input(cfg),
             ElementConfig::TextDisplay(cfg) => self.upsert_text_display(cfg),
         }
-
-        let new_height = self.element_render_height_by_id(&id).unwrap_or(0);
-        let delta = layout_reflow::height_delta(old_height, new_height);
-        if delta != 0 {
-            if let Some(y) = anchor_y {
-                let min_y = layout_reflow::min_y_after_change(y, old_height);
-                self.shift_elements_from_min_y(&id, min_y, delta);
-            }
-        }
-        self.refresh_height_cache();
     }
 
     pub fn remove_and_reflow(&mut self, id: &str) -> bool {
-        let Some(location) = self.element_location(id) else {
+        let Some(bounds) = self.element_bounds(id) else {
             return false;
         };
-        let removed_height = self.element_render_height_by_id(id).unwrap_or(0);
-        if !self.remove_element(id) {
+        let min_y = layout_reflow::min_y_after_change(bounds.y, bounds.height);
+        let rows = bounds.height as u16;
+        if !self.remove_element_cascade(id) {
             return false;
         }
-        if removed_height > 0 {
-            let min_y = layout_reflow::min_y_after_change(location.y, removed_height);
-            self.shift_elements_from_min_y(id, min_y, -(removed_height as i32));
+        if rows > 0 {
+            self.pull_elements_up_from(min_y, rows, &[]);
         }
         self.refresh_height_cache();
         true
@@ -122,22 +108,24 @@ impl RuntimeUi {
     }
 
     pub fn set_element_location(&mut self, id: &str, location: Location) -> bool {
-        if let Some(element) = self.element_mut_by_id(id) {
-            match element {
-                RuntimeElement::Button(button) => button.button.location = location,
-                RuntimeElement::TextInput(input) => input.location = location,
-                RuntimeElement::TextDisplay(display) => display.location = location,
-            }
-            true
-        } else {
-            false
+        let Some(old_location) = self.element_location(id) else {
+            return false;
+        };
+        let delta_x = location.x as i32 - old_location.x as i32;
+        let delta_y = location.y as i32 - old_location.y as i32;
+        if delta_x == 0 && delta_y == 0 {
+            return true;
         }
+        self.shift_element_subtree(id, delta_x as i16, delta_y);
+        self.recompute_all_relative_locations();
+        true
     }
 
     pub fn set_text_display_dimensions(&mut self, id: &str, width: usize, height: usize) -> bool {
         if let Some(RuntimeElement::TextDisplay(display)) = self.element_mut_by_id(id) {
             display.width = width.max(1);
             display.height = height.max(1);
+            self.recompute_all_relative_locations();
             true
         } else {
             false
@@ -167,6 +155,7 @@ impl RuntimeUi {
             input.cursor = input.field.text.chars().count();
             input.selection_anchor = None;
             self.invalidate_text_input_layout_cache(id);
+            self.recompute_all_relative_locations();
             true
         } else {
             false
@@ -192,4 +181,5 @@ impl RuntimeUi {
     pub(super) fn element_mut_by_id(&mut self, id: &str) -> Option<&mut RuntimeElement> {
         self.elements.get_mut(id)
     }
+
 }
