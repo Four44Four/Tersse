@@ -1,9 +1,12 @@
 //! Public API for building and styling TUI elements.
 
 pub mod clipboard;
+pub mod constants;
 pub mod pure;
 pub mod runtime;
 pub mod terminal_input;
+
+pub use constants::TERM_RESIZE_DEBOUNCE_MS;
 
 use std::error::Error;
 use std::fmt::{Display, Formatter};

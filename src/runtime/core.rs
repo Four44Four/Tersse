@@ -3,7 +3,7 @@ use std::time::Duration;
 use pancurses::{curs_set, endwin, initscr, noecho};
 
 use crate::terminal_input;
-use crate::terminal_input::TerminalKey;
+use crate::terminal_input::{TerminalKey, TerminalPoll};
 use crate::ScreenTitle;
 
 use super::types::UiEvent;
@@ -18,7 +18,7 @@ impl RuntimeUi {
         pancurses::start_color();
         pancurses::use_default_colors();
 
-        Self {
+        let mut ui = Self {
             win,
             title: None,
             elements: Vec::new(),
@@ -26,7 +26,11 @@ impl RuntimeUi {
             pair_cache: std::collections::HashMap::new(),
             next_pair_id: 1,
             cached_heights: std::collections::HashMap::new(),
-        }
+            resize_debounce_until: None,
+            last_terminal_yx: None,
+        };
+        let _ = ui.reload_screen_after_resize();
+        ui
     }
 
     pub fn set_title(&mut self, title: ScreenTitle) {
@@ -41,13 +45,21 @@ impl RuntimeUi {
     ///
     /// Returns `false` when the runtime receives a quit key.
     pub fn run_frame(&mut self, timeout: Duration) -> bool {
-        self.draw();
-        !matches!(self.poll_event(timeout), UiEvent::Quit)
+        let quit = matches!(self.poll_event(timeout), UiEvent::Quit);
+        let _ = self.tick_resize_debounce();
+        if !self.is_resize_debounce_active() {
+            self.draw();
+        }
+        !quit
     }
 
     pub fn poll_event(&mut self, timeout: Duration) -> UiEvent {
-        match terminal_input::poll_key(timeout) {
-            Ok(Some(key)) => self.handle_key(key),
+        match terminal_input::poll_terminal(timeout) {
+            Ok(Some(TerminalPoll::Resized { .. })) => {
+                self.note_terminal_resize();
+                UiEvent::None
+            }
+            Ok(Some(TerminalPoll::Key(key))) => self.handle_key(key),
             Ok(None) => UiEvent::None,
             Err(_) => UiEvent::Quit,
         }

@@ -2,7 +2,7 @@
 
 use crate::pure::keyboard::arrow_extend_selection;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
-use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
+use crossterm::terminal::{disable_raw_mode, enable_raw_mode, size};
 use std::io;
 use std::time::Duration;
 
@@ -37,6 +37,16 @@ pub enum TerminalKey {
     Char(char),
 }
 
+/// Result of polling the terminal for input.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TerminalPoll {
+    Key(TerminalKey),
+    Resized {
+        cols: u16,
+        rows: u16,
+    },
+}
+
 pub fn enter_raw_mode() -> io::Result<()> {
     enable_raw_mode()
 }
@@ -45,15 +55,28 @@ pub fn leave_raw_mode() -> io::Result<()> {
     disable_raw_mode()
 }
 
-/// Poll for a key press. Returns `Ok(None)` on timeout or non-key events.
-pub fn poll_key(timeout: Duration) -> io::Result<Option<TerminalKey>> {
-    if !event::poll(timeout)? {
-        return Ok(None);
+/// Current terminal size as `(columns, rows)`.
+pub fn terminal_size() -> io::Result<(u16, u16)> {
+    size()
+}
+
+/// Poll for a key press or terminal resize. Returns `Ok(None)` on timeout.
+pub fn poll_terminal(timeout: Duration) -> io::Result<Option<TerminalPoll>> {
+    let poll_timeout = timeout;
+    loop {
+        if !event::poll(poll_timeout)? {
+            return Ok(None);
+        }
+        match event::read()? {
+            Event::Key(key) => {
+                return Ok(map_key_event(key).map(TerminalPoll::Key));
+            }
+            Event::Resize(cols, rows) => {
+                return Ok(Some(TerminalPoll::Resized { cols, rows }));
+            }
+            _ => continue,
+        }
     }
-    Ok(match event::read()? {
-        Event::Key(key) => map_key_event(key),
-        _ => None,
-    })
 }
 
 fn map_key_event(key: KeyEvent) -> Option<TerminalKey> {
