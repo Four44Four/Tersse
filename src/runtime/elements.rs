@@ -9,9 +9,10 @@ use super::RuntimeUi;
 
 impl RuntimeUi {
     pub fn upsert_button(&mut self, config: ButtonConfig) {
+        let focused_id = self.current_focused_id();
         let element = RuntimeElement::Button(ButtonElement::from_config(config));
         self.elements.upsert(element);
-        self.sync_focus_position();
+        self.restore_focus(focused_id);
         self.refresh_height_cache();
     }
 
@@ -23,18 +24,20 @@ impl RuntimeUi {
     }
 
     pub fn upsert_text_input(&mut self, config: TextInputConfig) {
+        let focused_id = self.current_focused_id();
         let id = config.id.clone();
         let element = RuntimeElement::TextInput(TextInputElement::from_config(config));
         self.elements.upsert(element);
-        self.sync_focus_position();
+        self.restore_focus(focused_id);
         self.invalidate_text_input_layout_cache(&id);
         self.refresh_height_cache();
     }
 
     pub fn upsert_text_display(&mut self, config: TextDisplayConfig) {
+        let focused_id = self.current_focused_id();
         let element = RuntimeElement::TextDisplay(TextDisplayRuntimeElement::from_config(config));
         self.elements.upsert(element);
-        self.sync_focus_position();
+        self.restore_focus(focused_id);
         self.refresh_height_cache();
     }
 
@@ -88,8 +91,9 @@ impl RuntimeUi {
     }
 
     pub fn remove_element(&mut self, id: &str) -> bool {
+        let focused_id = self.current_focused_id();
         if self.elements.remove(id).is_some() {
-            self.sync_focus_position();
+            self.restore_focus(focused_id);
             self.cached_heights.remove(id);
             self.invalidate_text_input_layout_cache(id);
             true
@@ -108,8 +112,9 @@ impl RuntimeUi {
     }
 
     pub fn set_focus_number(&mut self, id: &str, focus_number: f64) -> bool {
+        let focused_id = self.current_focused_id();
         if self.elements.set_focus_number(id, focus_number) {
-            self.sync_focus_position();
+            self.restore_focus(focused_id);
             true
         } else {
             false

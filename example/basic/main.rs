@@ -6,9 +6,7 @@ use std::time::{Duration, Instant};
 use tersse::runtime::{ButtonConfig, ElementConfig, RuntimeUi, TextDisplayConfig, TextInputConfig};
 use tersse::Location;
 
-use style::{
-    button_style, locked_like_style, neutral_display_style, screen_title, text_input_style,
-};
+use style::{button_style, locked_like_style, screen_title, text_input_style};
 
 const POLL_TIMEOUT_MS: u64 = 50;
 const FLASH_FOO: Duration = Duration::from_secs(2);
@@ -64,14 +62,14 @@ impl App {
         self.foo_flash = Some(FlashMessage {
             expires_at: Instant::now() + FLASH_FOO,
         });
-        self.upsert_flash_display(ui, FOO_ID, FOO_TEXT_ID, "Button 1");
+        self.upsert_flash_display(ui, FOO_ID, FOO_TEXT_ID, 0.5, "Button 1");
     }
 
     fn handle_bar(&mut self, ui: &mut RuntimeUi) {
         self.bar_flash = Some(FlashMessage {
             expires_at: Instant::now() + FLASH_BAR,
         });
-        self.upsert_flash_display(ui, BAR_ID, BAR_TEXT_ID, "Button 2");
+        self.upsert_flash_display(ui, BAR_ID, BAR_TEXT_ID, 1.5, "Button 2");
     }
 
     fn handle_press(&mut self, ui: &mut RuntimeUi, app_state: Rc<RefCell<App>>) {
@@ -134,6 +132,7 @@ impl App {
         ui: &mut RuntimeUi,
         button_id: &str,
         display_id: &str,
+        focus_number: f64,
         text: &str,
     ) {
         let y = ui
@@ -146,8 +145,8 @@ impl App {
             location: Location { x: 0, y },
             width,
             height: 1,
-            focus_number: 99.0,
-            style: neutral_display_style(),
+            focus_number,
+            style: locked_like_style(),
             initial_text: text.to_string(),
         }));
     }

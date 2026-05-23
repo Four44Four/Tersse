@@ -36,18 +36,18 @@ pub fn locked_like_style() -> FocusStyle {
     }
 }
 
-pub fn neutral_display_style() -> FocusStyle {
-    FocusStyle {
-        focused: Style {
-            fg: Color::White,
-            bg: Color::Black,
-        },
-        unfocused: Style {
-            fg: Color::White,
-            bg: Color::Black,
-        },
-    }
-}
+// pub fn neutral_display_style() -> FocusStyle {
+//     FocusStyle {
+//         focused: Style {
+//             fg: Color::White,
+//             bg: Color::Black,
+//         },
+//         unfocused: Style {
+//             fg: Color::White,
+//             bg: Color::Black,
+//         },
+//     }
+// }
 
 pub fn text_input_style() -> TextInputStyle {
     TextInputStyle {

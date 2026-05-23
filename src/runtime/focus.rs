@@ -31,9 +31,13 @@ impl RuntimeUi {
         order.get(self.focused_position).cloned()
     }
 
-    pub(super) fn sync_focus_position(&mut self) {
+    pub(super) fn restore_focus(&mut self, focused_id: Option<String>) {
         let order = self.focus_order();
-        self.focused_position = focus_order::normalize_index(self.focused_position, order.len());
+        self.focused_position = focus_order::index_for_focused_id(
+            &order,
+            focused_id.as_deref(),
+            self.focused_position,
+        );
         self.sync_focus_flags();
     }
 
