@@ -118,8 +118,8 @@ fn control_character_insert_is_rejected() {
 #[test]
 fn truncate_text_to_max_rows_stops_before_overflow() {
     let text = "abcdef";
-    assert_eq!(truncate_text_to_max_rows(&text, 3, 1), "ab");
-    assert_eq!(truncate_text_to_max_rows(&text, 3, 2), "abcde");
+    assert_eq!(truncate_text_to_max_rows(&text, 3, 1), "abc");
+    assert_eq!(truncate_text_to_max_rows(&text, 3, 2), "abcdef");
 }
 
 #[test]
@@ -128,6 +128,6 @@ fn clamp_state_to_max_rows_trims_paste_overflow() {
     let pasted = paste_text(&s, "defghi").unwrap();
     assert!(!state_fits_in_max_rows(&pasted, 3, 2));
     let clamped = clamp_state_to_max_rows(&pasted, 3, 2);
-    assert_eq!(clamped.text, "abcde");
+    assert_eq!(clamped.text, "abcdef");
     assert!(state_fits_in_max_rows(&clamped, 3, 2));
 }

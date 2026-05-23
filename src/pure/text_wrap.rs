@@ -34,11 +34,13 @@ pub fn wrapped_line_count(text: &str, width: usize) -> usize {
 /// Rows to allocate in the UI (at least one row when empty).
 pub fn display_row_count(text: &str, width: usize) -> usize {
     if text.is_empty() {
-        1
-    } else {
-        let (line, _) = cursor_display_position(text, text.chars().count(), width);
-        line + 1
+        return 1;
     }
+    let mut rows = wrapped_line_count(text, width.max(1));
+    if text.ends_with('\n') {
+        rows += 1;
+    }
+    rows.max(1)
 }
 
 /// Map a character-index caret to `(line, col)` in the wrapped display.

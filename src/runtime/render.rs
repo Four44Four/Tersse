@@ -128,14 +128,14 @@ impl RuntimeUi {
         let (max_y, max_x) = self.win.get_max_yx();
         let x = location.x as i32;
         let y = self.scrolled_y(location.y as i32);
-        let rows = text_wrap::display_row_count(&text, width) as i32;
+        let lines = text_wrap::wrapped_lines(&text, width);
+        let logical_rows = text_wrap::display_row_count(&text, width) as i32;
         let draw_w = terminal_bounds::clip_rect(x, y, width as i32, 1, max_x, max_y).0;
-        if draw_w <= 0 || rows <= 0 {
+        if draw_w <= 0 || logical_rows <= 0 {
             return;
         }
-        let logical_rows = rows as usize;
 
-        self.fill_solid_rows(y, x, draw_w, rows, base_pair);
+        self.fill_solid_rows(y, x, draw_w, logical_rows, base_pair);
 
         let state = TextInputState {
             text: text.clone(),
@@ -145,32 +145,29 @@ impl RuntimeUi {
         let selection = text_input::selection_range(&state);
         let highlight_cells = text_wrap::selection_highlight_cells(&text, selection, width);
 
-        let mut char_idx = 0usize;
-        let mut drawn = std::collections::BTreeSet::new();
-        for ch in text.chars() {
-            let (line, col) = text_wrap::cursor_display_position(&text, char_idx, width);
-            if line >= logical_rows {
-                char_idx += 1;
+        let visible_lines =
+            terminal_bounds::visible_element_line_range(y, logical_rows, max_y);
+        let visible_start = visible_lines.start;
+        let visible_end = visible_lines.end;
+        for line_idx in visible_lines {
+            let line_idx = line_idx as usize;
+            let row_y = y + line_idx as i32;
+            let max_cols = terminal_bounds::max_element_row_cols(
+                x,
+                max_x,
+                row_y,
+                max_y,
+                width as i32,
+            ) as usize;
+            if max_cols == 0 {
                 continue;
             }
-            if ch != '\n' {
-                let row_y = y + line as i32;
-                if !terminal_bounds::row_is_visible(row_y, max_y) {
-                    char_idx += 1;
-                    continue;
-                }
-                let max_cols = terminal_bounds::max_element_row_cols(
-                    x,
-                    max_x,
-                    row_y,
-                    max_y,
-                    width as i32,
-                ) as usize;
+            let line = lines.get(line_idx).map(String::as_str).unwrap_or("");
+            for (col, ch) in line.chars().enumerate() {
                 if col >= max_cols {
-                    char_idx += 1;
-                    continue;
+                    break;
                 }
-                let pair = if highlight_cells.contains(&(line, col)) {
+                let pair = if highlight_cells.contains(&(line_idx, col)) {
                     selection_pair
                 } else {
                     base_pair
@@ -179,19 +176,23 @@ impl RuntimeUi {
                 self.win.mv(row_y, x + col as i32);
                 self.win.addch(ch);
                 self.win.attroff(COLOR_PAIR(pair as u64));
-                drawn.insert((line, col));
             }
-            char_idx += 1;
+            for col in line.chars().count()..max_cols {
+                if highlight_cells.contains(&(line_idx, col)) {
+                    self.win.attron(COLOR_PAIR(selection_pair as u64));
+                    self.win.mv(row_y, x + col as i32);
+                    self.win.addch(' ');
+                    self.win.attroff(COLOR_PAIR(selection_pair as u64));
+                }
+            }
         }
 
-        for (line, col) in highlight_cells {
-            if line >= logical_rows || drawn.contains(&(line, col)) {
+        for (line_idx, col) in highlight_cells {
+            let line_idx = line_idx as i32;
+            if line_idx < visible_start || line_idx >= visible_end {
                 continue;
             }
-            let row_y = y + line as i32;
-            if !terminal_bounds::row_is_visible(row_y, max_y) {
-                continue;
-            }
+            let row_y = y + line_idx;
             let max_cols = terminal_bounds::max_element_row_cols(
                 x,
                 max_x,
@@ -200,6 +201,13 @@ impl RuntimeUi {
                 width as i32,
             ) as usize;
             if col >= max_cols {
+                continue;
+            }
+            let line_len = lines
+                .get(line_idx as usize)
+                .map(|line| line.chars().count())
+                .unwrap_or(0);
+            if col < line_len {
                 continue;
             }
             self.win.attron(COLOR_PAIR(selection_pair as u64));
@@ -286,12 +294,11 @@ impl RuntimeUi {
         if w <= 0 || logical_rows <= 0 {
             return;
         }
+        let visible_rows =
+            terminal_bounds::visible_element_line_range(y, logical_rows, max_y);
         self.win.attron(COLOR_PAIR(pair as u64));
-        for row in 0..logical_rows {
+        for row in visible_rows {
             let row_y = y + row;
-            if !terminal_bounds::row_is_visible(row_y, max_y) {
-                continue;
-            }
             let row_w = terminal_bounds::cols_for_printing(x, max_x, row_y, max_y).min(w);
             if row_w <= 0 {
                 continue;

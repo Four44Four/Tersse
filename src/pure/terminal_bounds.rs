@@ -34,6 +34,25 @@ pub fn rows_visible_from(y: i32, terminal_max_y: i32) -> i32 {
 /// The lower-right cell `(max_y, max_x)` cannot receive output, so the bottom
 /// usable row allows one fewer column than other rows.
 
+/// Line indices `[start, end)` within an element that intersect visible terminal rows.
+pub fn visible_element_line_range(
+    anchor_y: i32,
+    logical_rows: i32,
+    terminal_max_y: i32,
+) -> std::ops::Range<i32> {
+    if logical_rows <= 0 {
+        return 0..0;
+    }
+    let max_row = content_max_y(terminal_max_y);
+    let first = if anchor_y < 0 { -anchor_y } else { 0 };
+    let last = (max_row - anchor_y).min(logical_rows - 1);
+    if first > last {
+        0..0
+    } else {
+        first..last + 1
+    }
+}
+
 /// Whether `row_y` is within the usable row range for TUI elements.
 pub fn row_is_visible(row_y: i32, terminal_max_y: i32) -> bool {
     let max_y = content_max_y(terminal_max_y);

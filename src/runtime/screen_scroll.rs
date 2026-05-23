@@ -41,7 +41,12 @@ impl RuntimeUi {
                     super::types::RuntimeElement::TextInput(input) => input.location.y,
                     super::types::RuntimeElement::TextDisplay(display) => display.location.y,
                 };
-                (y, self.element_render_height(element))
+                let height = self
+                    .cached_heights
+                    .get(element.id())
+                    .copied()
+                    .unwrap_or(1);
+                (y, height)
             })
             .collect::<Vec<_>>();
         let content_height =

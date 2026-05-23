@@ -26,6 +26,7 @@ impl RuntimeUi {
             pair_cache: std::collections::HashMap::new(),
             next_pair_id: 1,
             cached_heights: std::collections::HashMap::new(),
+            text_input_layout_cache: std::collections::HashMap::new(),
             resize_debounce_until: None,
             last_terminal_yx: None,
             screen_scroll: 0,

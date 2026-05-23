@@ -36,6 +36,7 @@ impl RuntimeUi {
             self.elements.push(element);
         }
         self.sync_focus_position();
+        self.invalidate_text_input_layout_cache(&id);
         self.refresh_height_cache();
     }
 
@@ -105,6 +106,7 @@ impl RuntimeUi {
             self.elements.remove(idx);
             self.sync_focus_position();
             self.cached_heights.remove(id);
+            self.invalidate_text_input_layout_cache(id);
             true
         } else {
             false
@@ -179,6 +181,7 @@ impl RuntimeUi {
             input.field.text = text.into();
             input.cursor = input.field.text.chars().count();
             input.selection_anchor = None;
+            self.invalidate_text_input_layout_cache(id);
             true
         } else {
             false

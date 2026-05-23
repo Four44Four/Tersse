@@ -29,6 +29,7 @@ impl RuntimeUi {
             input.field.text = state.text;
             input.cursor = state.cursor;
             input.selection_anchor = state.selection_anchor;
+            self.invalidate_text_input_layout_cache(id);
         }
     }
 }

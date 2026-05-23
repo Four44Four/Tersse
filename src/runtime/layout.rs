@@ -2,7 +2,7 @@ use crate::pure::layout_reflow;
 use crate::pure::text_wrap;
 
 use super::types::RuntimeElement;
-use super::RuntimeUi;
+use super::{RuntimeUi, TextInputLayoutCache};
 
 pub(crate) fn render_height_for_button() -> usize {
     1
@@ -29,7 +29,7 @@ impl RuntimeUi {
 
         for id in text_input_ids {
             let old_height = self.cached_heights.get(&id).copied().unwrap_or(1);
-            let new_height = self.element_render_height_by_id(&id).unwrap_or(old_height);
+            let new_height = self.text_input_render_height(&id).unwrap_or(old_height);
             let delta = layout_reflow::height_delta(old_height, new_height);
             if delta == 0 {
                 continue;
@@ -85,13 +85,45 @@ impl RuntimeUi {
         }
     }
 
+    pub(super) fn text_input_render_height(&mut self, id: &str) -> Option<usize> {
+        let RuntimeElement::TextInput(input) = self.element_by_id(id)? else {
+            return None;
+        };
+        let width = input.field.width.max(1);
+        let text_len = input.field.text.len();
+        if let Some(cache) = self.text_input_layout_cache.get(id) {
+            if cache.text_len == text_len && cache.width == width {
+                return Some(cache.height);
+            }
+        }
+        let height = render_height_for_text_input_text(&input.field.text, width);
+        self.text_input_layout_cache.insert(
+            id.to_string(),
+            TextInputLayoutCache {
+                text_len,
+                width,
+                height,
+            },
+        );
+        Some(height)
+    }
+
+    pub(super) fn invalidate_text_input_layout_cache(&mut self, id: &str) {
+        self.text_input_layout_cache.remove(id);
+    }
+
     pub(super) fn refresh_height_cache(&mut self) {
         self.cached_heights.clear();
-        for element in &self.elements {
-            self.cached_heights.insert(
-                element.id().to_string(),
-                self.element_render_height(element),
-            );
+        let ids: Vec<String> = self.elements.iter().map(|e| e.id().to_string()).collect();
+        for id in ids {
+            let height = match self.element_by_id(&id) {
+                Some(RuntimeElement::TextInput(_)) => {
+                    self.text_input_render_height(&id).unwrap_or(1)
+                }
+                Some(other) => self.element_render_height(other),
+                None => 1,
+            };
+            self.cached_heights.insert(id, height);
         }
     }
 }

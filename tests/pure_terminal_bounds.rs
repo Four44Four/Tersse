@@ -1,6 +1,7 @@
 use tersse::pure::terminal_bounds::{
     clip_height_at_terminal, clip_rect, clip_str_to_cols, cols_for_printing, cols_visible_from,
     content_max_y, max_element_row_cols, row_is_visible, rows_visible_from,
+    visible_element_line_range,
 };
 
 #[test]
@@ -21,6 +22,13 @@ fn clip_height_for_anchor_above_viewport() {
     assert_eq!(rows_visible_from(-3, 23), 23);
     assert_eq!(clip_height_at_terminal(-3, 10, 23), 10);
     assert_eq!(clip_height_at_terminal(-3, 30, 23), 23);
+}
+
+#[test]
+fn visible_element_line_range_matches_viewport() {
+    assert_eq!(visible_element_line_range(4, 100, 23), 0..19);
+    assert_eq!(visible_element_line_range(-3, 100, 23), 3..26);
+    assert_eq!(visible_element_line_range(30, 5, 23), 0..0);
 }
 
 #[test]

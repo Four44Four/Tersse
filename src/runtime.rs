@@ -24,6 +24,13 @@ pub use types::{
 
 use types::RuntimeElement;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct TextInputLayoutCache {
+    text_len: usize,
+    width: usize,
+    height: usize,
+}
+
 pub fn runtime_terminal_color_code(color: crate::Color) -> i16 {
     colors::terminal_color_code(color)
 }
@@ -60,6 +67,7 @@ pub struct RuntimeUi {
     pair_cache: HashMap<(i16, i16), i16>,
     next_pair_id: i16,
     cached_heights: HashMap<String, usize>,
+    text_input_layout_cache: HashMap<String, TextInputLayoutCache>,
     resize_debounce_until: Option<Instant>,
     last_terminal_yx: Option<(i32, i32)>,
     screen_scroll: usize,
