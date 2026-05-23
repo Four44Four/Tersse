@@ -94,6 +94,15 @@ fn paste_includes_newlines() {
 }
 
 #[test]
+fn paste_inserts_large_text_in_one_step() {
+    let s = state("ab", 1, None);
+    let chunk: String = "x".repeat(500);
+    let next = paste_text(&s, &chunk).unwrap();
+    assert_eq!(next.text.chars().count(), 502);
+    assert_eq!(next.cursor, 501);
+}
+
+#[test]
 fn arrow_at_text_edges_does_nothing() {
     let left_edge = state("abc", 0, None);
     let right_edge = state("abc", 3, None);

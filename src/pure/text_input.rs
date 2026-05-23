@@ -258,6 +258,13 @@ pub fn clamp_state_to_max_rows(
     }
 }
 
+fn sanitize_paste(paste: &str) -> String {
+    paste
+        .chars()
+        .filter(|c| !c.is_control() || *c == '\t' || *c == '\n')
+        .collect()
+}
+
 /// Insert clipboard text at the cursor (replaces any active selection).
 pub fn paste_text(state: &TextInputState, paste: &str) -> Option<TextInputState> {
     let base = if state.has_selection() {
@@ -265,15 +272,14 @@ pub fn paste_text(state: &TextInputState, paste: &str) -> Option<TextInputState>
     } else {
         state.clone()
     };
-    let mut text = base.text;
-    let mut cursor = base.cursor;
-    for c in paste
-        .chars()
-        .filter(|c| !c.is_control() || *c == '\t' || *c == '\n')
-    {
-        insert_char_at(&mut text, cursor, c);
-        cursor += 1;
+    let insert = sanitize_paste(paste);
+    if insert.is_empty() {
+        return Some(base);
     }
+    let byte_index = byte_index_for_char(&base.text, base.cursor);
+    let mut text = base.text;
+    text.insert_str(byte_index, &insert);
+    let cursor = base.cursor + insert.chars().count();
     Some(TextInputState {
         text,
         cursor,

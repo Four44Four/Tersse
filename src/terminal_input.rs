@@ -1,9 +1,13 @@
 //! Crossterm raw-mode keyboard input (cross-platform, including Shift+arrow modifiers).
 
 use crate::pure::keyboard::arrow_extend_selection;
-use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+use crossterm::event::{
+    self, DisableBracketedPaste, EnableBracketedPaste, Event, KeyCode, KeyEvent, KeyEventKind,
+    KeyModifiers,
+};
+use crossterm::execute;
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode, size};
-use std::io;
+use std::io::{self, stdout};
 use std::time::Duration;
 
 /// Normalized key events for the UI loop.
@@ -40,9 +44,11 @@ pub enum TerminalKey {
 }
 
 /// Result of polling the terminal for input.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TerminalPoll {
     Key(TerminalKey),
+    /// Full paste from the terminal (bracketed paste mode).
+    Paste(String),
     Resized {
         cols: u16,
         rows: u16,
@@ -50,10 +56,13 @@ pub enum TerminalPoll {
 }
 
 pub fn enter_raw_mode() -> io::Result<()> {
-    enable_raw_mode()
+    enable_raw_mode()?;
+    execute!(stdout(), EnableBracketedPaste)?;
+    Ok(())
 }
 
 pub fn leave_raw_mode() -> io::Result<()> {
+    let _ = execute!(stdout(), DisableBracketedPaste);
     disable_raw_mode()
 }
 
@@ -73,6 +82,7 @@ pub fn poll_terminal(timeout: Duration) -> io::Result<Option<TerminalPoll>> {
             Event::Key(key) => {
                 return Ok(map_key_event(key).map(TerminalPoll::Key));
             }
+            Event::Paste(paste) => return Ok(Some(TerminalPoll::Paste(paste))),
             Event::Resize(cols, rows) => {
                 return Ok(Some(TerminalPoll::Resized { cols, rows }));
             }

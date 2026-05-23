@@ -61,6 +61,10 @@ impl RuntimeUi {
                 self.note_terminal_resize();
                 UiEvent::None
             }
+            Ok(Some(TerminalPoll::Paste(paste))) => {
+                let _ = self.handle_text_input_paste(&paste);
+                UiEvent::None
+            }
             Ok(Some(TerminalPoll::Key(key))) => self.handle_key(key),
             Ok(None) => UiEvent::None,
             Err(_) => UiEvent::Quit,

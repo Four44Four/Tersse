@@ -60,6 +60,23 @@ impl RuntimeUi {
         }
     }
 
+    pub(super) fn handle_text_input_paste(&mut self, paste: &str) -> bool {
+        let Some(id) = self.current_focused_id() else {
+            return false;
+        };
+        let Some(RuntimeElement::TextInput(input)) = self.element_by_id(&id) else {
+            return false;
+        };
+        if input.field.locked {
+            return false;
+        }
+        let state = self.text_input_state(&id);
+        if let Some(pasted) = text_input::paste_text(&state, paste) {
+            self.apply_text_input_paste(&id, pasted);
+        }
+        true
+    }
+
     pub(super) fn handle_text_input_editing(&mut self, key: TerminalKey) -> bool {
         let Some(id) = self.current_focused_id() else {
             return false;
@@ -113,9 +130,7 @@ impl RuntimeUi {
             }
             TerminalKey::Paste => {
                 if let Some(paste) = clipboard::get_text() {
-                    if let Some(pasted) = text_input::paste_text(&state, &paste) {
-                        self.apply_text_input_paste(&id, pasted);
-                    }
+                    return self.handle_text_input_paste(&paste);
                 }
                 return true;
             }
