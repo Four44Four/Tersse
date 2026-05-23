@@ -21,6 +21,34 @@ pub use types::{
 
 use types::RuntimeElement;
 
+pub fn runtime_terminal_color_code(color: crate::Color) -> i16 {
+    colors::terminal_color_code(color)
+}
+
+pub fn runtime_render_height_for_button() -> usize {
+    layout::render_height_for_button()
+}
+
+pub fn runtime_render_height_for_text_input_text(text: &str, width: usize) -> usize {
+    layout::render_height_for_text_input_text(text, width)
+}
+
+pub fn runtime_render_height_for_text_display(height: usize) -> usize {
+    layout::render_height_for_text_display(height)
+}
+
+pub fn runtime_clamp_text_display_dimensions(width: usize, height: usize) -> (usize, usize) {
+    types::clamp_text_display_dimensions(width, height)
+}
+
+pub fn runtime_text_input_state_snapshot(
+    text: impl Into<String>,
+    cursor: usize,
+    selection_anchor: Option<usize>,
+) -> crate::pure::text_input::TextInputState {
+    types::text_input_state_from_parts(text, cursor, selection_anchor)
+}
+
 pub struct RuntimeUi {
     win: Window,
     title: Option<ScreenTitle>,

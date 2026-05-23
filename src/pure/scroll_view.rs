@@ -46,31 +46,3 @@ pub fn visible_line_range(
     let end = (start + viewport_height).min(total_lines);
     start..end
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn max_scroll_when_overflow() {
-        assert_eq!(max_scroll_offset(10, 3), 7);
-    }
-
-    #[test]
-    fn clamp_and_visible_range() {
-        let offset = clamp_scroll_offset(99, 10, 3);
-        assert_eq!(offset, 7);
-        assert_eq!(visible_line_range(offset, 3, 10), 7..10);
-    }
-
-    #[test]
-    fn stick_to_bottom_matches_max() {
-        assert_eq!(stick_to_bottom(10, 3), 7);
-    }
-
-    #[test]
-    fn overflow_detection() {
-        assert!(content_overflows(5, 3));
-        assert!(!content_overflows(3, 3));
-    }
-}

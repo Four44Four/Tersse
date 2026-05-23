@@ -4,6 +4,18 @@ use crate::pure::text_wrap;
 use super::types::RuntimeElement;
 use super::RuntimeUi;
 
+pub(crate) fn render_height_for_button() -> usize {
+    1
+}
+
+pub(crate) fn render_height_for_text_input_text(text: &str, width: usize) -> usize {
+    text_wrap::display_row_count(text, width.max(1))
+}
+
+pub(crate) fn render_height_for_text_display(height: usize) -> usize {
+    height.max(1)
+}
+
 impl RuntimeUi {
     pub(super) fn auto_reflow_for_dynamic_heights(&mut self) {
         let text_input_ids = self
@@ -60,11 +72,11 @@ impl RuntimeUi {
 
     pub(super) fn element_render_height(element: &RuntimeElement) -> usize {
         match element {
-            RuntimeElement::Button(_) => 1,
+            RuntimeElement::Button(_) => render_height_for_button(),
             RuntimeElement::TextInput(input) => {
-                text_wrap::display_row_count(&input.field.text, input.field.width.max(1))
+                render_height_for_text_input_text(&input.field.text, input.field.width)
             }
-            RuntimeElement::TextDisplay(display) => display.height.max(1),
+            RuntimeElement::TextDisplay(display) => render_height_for_text_display(display.height),
         }
     }
 

@@ -18,7 +18,7 @@ impl RuntimeUi {
     }
 }
 
-fn terminal_color_code(color: Color) -> i16 {
+pub(crate) fn terminal_color_code(color: Color) -> i16 {
     match color {
         Color::Default => -1,
         Color::Black => pancurses::COLOR_BLACK,

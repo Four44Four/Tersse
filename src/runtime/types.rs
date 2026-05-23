@@ -105,6 +105,22 @@ pub(super) enum RuntimeElement {
     TextDisplay(TextDisplayRuntimeElement),
 }
 
+pub(crate) fn clamp_text_display_dimensions(width: usize, height: usize) -> (usize, usize) {
+    (width.max(1), height.max(1))
+}
+
+pub(crate) fn text_input_state_from_parts(
+    text: impl Into<String>,
+    cursor: usize,
+    selection_anchor: Option<usize>,
+) -> TextInputState {
+    TextInputState {
+        text: text.into(),
+        cursor,
+        selection_anchor,
+    }
+}
+
 impl ButtonElement {
     pub fn from_config(config: ButtonConfig) -> Self {
         let ButtonConfig {
@@ -154,12 +170,13 @@ impl TextInputElement {
 
 impl TextDisplayRuntimeElement {
     pub fn from_config(config: TextDisplayConfig) -> Self {
+        let (width, height) = clamp_text_display_dimensions(config.width, config.height);
         Self {
             id: config.id,
             focus_index: config.focus_index,
             location: config.location,
-            width: config.width.max(1),
-            height: config.height.max(1),
+            width,
+            height,
             scroll: 0,
             display: create_text_display_element(config.initial_text),
             style: config.style,
@@ -188,10 +205,10 @@ impl RuntimeElement {
         let RuntimeElement::TextInput(input) = self else {
             return None;
         };
-        Some(TextInputState {
-            text: input.field.text.clone(),
-            cursor: input.cursor,
-            selection_anchor: input.selection_anchor,
-        })
+        Some(text_input_state_from_parts(
+            input.field.text.clone(),
+            input.cursor,
+            input.selection_anchor,
+        ))
     }
 }

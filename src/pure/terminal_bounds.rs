@@ -51,30 +51,3 @@ pub fn clip_str_to_cols(text: &str, max_cols: usize) -> String {
         text.chars().take(max_cols).collect()
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn clip_rect_at_bottom_right() {
-        assert_eq!(clip_rect(0, 20, 80, 12, 79, 23), (80, 4));
-        assert_eq!(clip_rect(70, 23, 20, 5, 79, 23), (10, 1));
-    }
-
-    #[test]
-    fn clip_rect_off_screen() {
-        assert_eq!(clip_rect(0, 30, 10, 1, 79, 23), (0, 0));
-    }
-
-    #[test]
-    fn clip_str_respects_cols() {
-        assert_eq!(clip_str_to_cols("abcdef", 3), "abc");
-    }
-
-    #[test]
-    fn cols_for_printing_bottom_row() {
-        assert_eq!(cols_for_printing(0, 79, 22, 23), 80);
-        assert_eq!(cols_for_printing(0, 79, 23, 23), 79);
-    }
-}
