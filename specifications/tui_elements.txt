@@ -1,0 +1,5 @@
+ - Can be focused by navigating through page by pressing arrow keys
+ - Has a fixed order of focus cycling explicitly defined
+    - Similar to tab navigation order in webpages
+    - Up/Right cycle to next element
+    - Down/Left cycle to previous element

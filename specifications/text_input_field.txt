@@ -1,0 +1,53 @@
+ - Has all properties of TUI elements
+ - Can navigate to next/previous element using Up and Down arrow keys
+ - If text input field is focused and Left/Right arrow keys are pressed:
+    - Do not change focused element
+    - Change text cursor location 1 character to the respective direction of the arrow key pressed
+    - If the text cursor is at the end or beginning of the text input field and the arrow key corresponding to the direction of no text is pressed:
+       - Do nothing
+ - If Shift key is held and Left/Right arrow keys are pressed:
+    - Activate text selection:
+       - Any characters traversed while both Shift and Left/Right arrow keys will be considered selected
+       - If text cursor traverses in the opposite direction:
+          - Exclude the traversed character from the selected characters
+ - If a non-arrow or non-Ctrl modified key is pressed:
+    - If Delete or Backspace key is pressed:
+       - Just delete the selected text
+    - Else:
+       - Delete the selected text and insert the character that would be inserted by the pressed key into the position of the previously selected characters
+    - Deactivate text selection
+ - If a Left/Right arrow key is pressed without Shift being held and there is text that is selected:
+    - Deactivate the text selection
+    - Do nothing to the selected text
+    - Cursor will move to the intended text position as if there was no selection active prior
+ - Do the following when the specified Ctrl+* keys are pressed and there is active selected text:
+    - Ctrl+c -> {
+        - Copy text to system clipboard
+        - Deactivate text selection
+    }
+    - Ctrl+x -> {
+        - Copy text to system clipboard
+        - Delete selected text
+        - Deactivate text selection
+    }
+    - Ctrl+v -> {
+        - Insert text from system clipboard at current text cursor position
+    }
+ - When the element is focused:
+    - Make the background a solid alternative color
+    - Make the foreground a color that contrasts with the background
+ - When the element is unfocused:
+    - Make the background blend in with default background
+ - When the element is locked:
+    - Use a different set of colors for foreground and background
+    - Colors should be distinct locked element is focused or not focused
+ - When text input exceeds initial width:
+    - Wrap text around width
+    - Extend height of text input to accommodate new line of text that was wrapped
+ - When Enter key is pressed:
+    - Add a line break character at current position
+    - Move all lines below current line of text cursor down by 1
+       - Increase height of text input by 1
+    - Move all text in current line to start of next line
+ - When a newline character is selected:
+    - Draw visual selection indicator from the position of the newline character to the end of the current line

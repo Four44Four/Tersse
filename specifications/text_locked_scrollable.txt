@@ -1,0 +1,11 @@
+ - Has all properties of TUI elements
+ - Shares the same colors as a locked text input field element
+ - Shares all focused behavior as text input field element
+ - Does not respond to keyboard input, unlike text input field element
+ - Is created with a initial height
+    - When text content exceeds initial height:
+       - The text content beyond the initial height is hidden
+ - When the element is focused and user uses Up/Down arrow keys while holding down Alt or Meta key:
+    - The element scrolls to reveal the next hidden lines
+    - The element scrolls to hide the topmost lines
+    - Each press of the Up/Down arrow keys moves the element 1 line in the respective arrow key directions
