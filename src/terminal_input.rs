@@ -28,6 +28,12 @@ pub enum TerminalKey {
     Down,
     AltUp,
     AltDown,
+    /// Ctrl+C — copy selection (text input fields only).
+    Copy,
+    /// Ctrl+X — cut selection (text input fields only).
+    Cut,
+    /// Ctrl+V — paste from clipboard (text input fields only).
+    Paste,
     Char(char),
 }
 
@@ -71,6 +77,9 @@ fn map_key_event(key: KeyEvent) -> Option<TerminalKey> {
         }),
         KeyCode::Up if key.modifiers.contains(KeyModifiers::ALT) => Some(TerminalKey::AltUp),
         KeyCode::Down if key.modifiers.contains(KeyModifiers::ALT) => Some(TerminalKey::AltDown),
+        KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => Some(TerminalKey::Copy),
+        KeyCode::Char('x') if key.modifiers.contains(KeyModifiers::CONTROL) => Some(TerminalKey::Cut),
+        KeyCode::Char('v') if key.modifiers.contains(KeyModifiers::CONTROL) => Some(TerminalKey::Paste),
         KeyCode::Up => Some(TerminalKey::Up),
         KeyCode::Down => Some(TerminalKey::Down),
         KeyCode::Char('q' | 'Q') => Some(TerminalKey::Quit),

@@ -173,6 +173,55 @@ pub fn insert_tab(state: &TextInputState) -> Option<TextInputState> {
     insert_char(state, '\t')
 }
 
+/// Selected substring, if any.
+pub fn selection_text(state: &TextInputState) -> Option<String> {
+    let (start, end) = selection_range(state)?;
+    let start_byte = byte_index_for_char(&state.text, start);
+    let end_byte = byte_index_for_char(&state.text, end);
+    Some(state.text[start_byte..end_byte].to_string())
+}
+
+/// Clear selection without changing text or cursor.
+pub fn clear_selection(state: &TextInputState) -> TextInputState {
+    TextInputState {
+        text: state.text.clone(),
+        cursor: state.cursor,
+        selection_anchor: None,
+    }
+}
+
+/// Copy selection: returns cleared-selection state and text to place on the clipboard.
+pub fn copy_selection(state: &TextInputState) -> Option<(TextInputState, String)> {
+    let text = selection_text(state)?;
+    Some((clear_selection(state), text))
+}
+
+/// Cut selection: returns state with selection removed and text for the clipboard.
+pub fn cut_selection(state: &TextInputState) -> Option<(TextInputState, String)> {
+    let text = selection_text(state)?;
+    Some((delete_selection(state), text))
+}
+
+/// Insert clipboard text at the cursor (replaces any active selection).
+pub fn paste_text(state: &TextInputState, paste: &str) -> Option<TextInputState> {
+    let base = if state.has_selection() {
+        delete_selection(state)
+    } else {
+        state.clone()
+    };
+    let mut text = base.text;
+    let mut cursor = base.cursor;
+    for c in paste.chars().filter(|c| !c.is_control() || *c == '\t') {
+        insert_char_at(&mut text, cursor, c);
+        cursor += 1;
+    }
+    Some(TextInputState {
+        text,
+        cursor,
+        selection_anchor: None,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -214,5 +263,31 @@ mod tests {
         let next = cursor_left(&s, true).unwrap();
         assert_eq!(next.cursor, 1);
         assert_eq!(next.selection_anchor, Some(2));
+    }
+
+    #[test]
+    fn copy_clears_selection() {
+        let s = state("hello", 4, Some(1));
+        let (next, text) = copy_selection(&s).unwrap();
+        assert_eq!(text, "ell");
+        assert_eq!(next.text, "hello");
+        assert_eq!(next.selection_anchor, None);
+    }
+
+    #[test]
+    fn cut_removes_selection() {
+        let s = state("hello", 4, Some(1));
+        let (next, text) = cut_selection(&s).unwrap();
+        assert_eq!(text, "ell");
+        assert_eq!(next.text, "ho");
+        assert_eq!(next.cursor, 1);
+    }
+
+    #[test]
+    fn paste_replaces_selection() {
+        let s = state("hello", 4, Some(1));
+        let next = paste_text(&s, "X").unwrap();
+        assert_eq!(next.text, "hXo");
+        assert_eq!(next.cursor, 2);
     }
 }

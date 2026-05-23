@@ -2,6 +2,7 @@
 
 mod ai_output;
 mod backend;
+mod clipboard;
 mod constants;
 mod pure;
 mod terminal_input;
@@ -609,6 +610,28 @@ fn handle_tab_in_input(app: &mut App) {
     );
 }
 
+fn handle_copy(app: &mut App) {
+    if let Some((state, text)) = text_input::copy_selection(&ai_input_state(app)) {
+        if clipboard::set_text(&text) {
+            set_ai_input_state(app, state);
+        }
+    }
+}
+
+fn handle_cut(app: &mut App) {
+    if let Some((state, text)) = text_input::cut_selection(&ai_input_state(app)) {
+        if clipboard::set_text(&text) {
+            set_ai_input_state(app, state);
+        }
+    }
+}
+
+fn handle_paste(app: &mut App) {
+    if let Some(paste) = clipboard::get_text() {
+        apply_ai_input(app, text_input::paste_text(&ai_input_state(app), &paste));
+    }
+}
+
 fn main() {
     load_env_files();
 
@@ -693,10 +716,16 @@ fn main() {
                     viewport,
                 );
             }
+            Some(TerminalKey::Copy) if ai_input_editing(&app) => handle_copy(&mut app),
+            Some(TerminalKey::Cut) if ai_input_editing(&app) => handle_cut(&mut app),
+            Some(TerminalKey::Paste) if ai_input_editing(&app) => handle_paste(&mut app),
             Some(TerminalKey::Char(c)) if ai_input_editing(&app) => handle_input_char(&mut app, c),
             Some(TerminalKey::Backspace)
             | Some(TerminalKey::Delete)
             | Some(TerminalKey::Char(_))
+            | Some(TerminalKey::Copy)
+            | Some(TerminalKey::Cut)
+            | Some(TerminalKey::Paste)
             | Some(TerminalKey::Quit)
             | Some(TerminalKey::AltUp)
             | Some(TerminalKey::AltDown)
