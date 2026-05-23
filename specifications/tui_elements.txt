@@ -4,3 +4,5 @@
     - Up/Right cycle to next element
     - Down/Left cycle to previous element
  - Do not render TUI elements beyond terminal bounds
+ - Cut off parts of multi-line TUI elements that exceed terminal height
+ - Cut off parts of TUI elements that exceed terminal width

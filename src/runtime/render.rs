@@ -66,6 +66,9 @@ impl RuntimeUi {
         let (max_y, max_x) = self.win.get_max_yx();
         let x = location.x as i32;
         let y = location.y as i32;
+        if !terminal_bounds::row_is_visible(y, max_y) {
+            return;
+        }
         let (_, draw_h) =
             terminal_bounds::clip_rect(x, y, width.max(1) as i32, 1, max_x, max_y);
         if draw_h <= 0 {
@@ -121,13 +124,13 @@ impl RuntimeUi {
         let x = location.x as i32;
         let y = location.y as i32;
         let rows = text_wrap::display_row_count(&text, width) as i32;
-        let (_, draw_h) = terminal_bounds::clip_rect(x, y, width as i32, rows, max_x, max_y);
-        if draw_h <= 0 {
+        let (draw_w, draw_h) = terminal_bounds::clip_rect(x, y, width as i32, rows, max_x, max_y);
+        if draw_w <= 0 || draw_h <= 0 {
             return;
         }
         let draw_rows = draw_h as usize;
 
-        self.fill_solid(y, x, width as i32, draw_h, base_pair);
+        self.fill_solid(y, x, draw_w, draw_h, base_pair);
 
         let state = TextInputState {
             text: text.clone(),
@@ -146,16 +149,29 @@ impl RuntimeUi {
                 continue;
             }
             if ch != '\n' {
+                let row_y = y + line as i32;
+                if !terminal_bounds::row_is_visible(row_y, max_y) {
+                    char_idx += 1;
+                    continue;
+                }
+                let max_cols = terminal_bounds::max_element_row_cols(
+                    x,
+                    max_x,
+                    row_y,
+                    max_y,
+                    width as i32,
+                ) as usize;
+                if col >= max_cols {
+                    char_idx += 1;
+                    continue;
+                }
                 let pair = if highlight_cells.contains(&(line, col)) {
                     selection_pair
                 } else {
                     base_pair
                 };
                 self.win.attron(COLOR_PAIR(pair as u64));
-                self.win.mv(
-                    location.y as i32 + line as i32,
-                    location.x as i32 + col as i32,
-                );
+                self.win.mv(row_y, x + col as i32);
                 self.win.addch(ch);
                 self.win.attroff(COLOR_PAIR(pair as u64));
                 drawn.insert((line, col));
@@ -167,11 +183,22 @@ impl RuntimeUi {
             if line >= draw_rows || drawn.contains(&(line, col)) {
                 continue;
             }
+            let row_y = y + line as i32;
+            if !terminal_bounds::row_is_visible(row_y, max_y) {
+                continue;
+            }
+            let max_cols = terminal_bounds::max_element_row_cols(
+                x,
+                max_x,
+                row_y,
+                max_y,
+                width as i32,
+            ) as usize;
+            if col >= max_cols {
+                continue;
+            }
             self.win.attron(COLOR_PAIR(selection_pair as u64));
-            self.win.mv(
-                location.y as i32 + line as i32,
-                location.x as i32 + col as i32,
-            );
+            self.win.mv(row_y, x + col as i32);
             self.win.addch(' ');
             self.win.attroff(COLOR_PAIR(selection_pair as u64));
         }
@@ -220,9 +247,18 @@ impl RuntimeUi {
         self.win.attron(COLOR_PAIR(pair as u64));
         for (row, line_idx) in range.enumerate() {
             let row_y = y + row as i32;
-            let row_cols = terminal_bounds::cols_for_printing(x, max_x, row_y, max_y) as usize;
+            if !terminal_bounds::row_is_visible(row_y, max_y) {
+                continue;
+            }
+            let row_cols = terminal_bounds::max_element_row_cols(
+                x,
+                max_x,
+                row_y,
+                max_y,
+                width as i32,
+            ) as usize;
             self.win.mv(row_y, x);
-            let line = terminal_bounds::clip_str_to_cols(&lines[line_idx], row_cols.min(width));
+            let line = terminal_bounds::clip_str_to_cols(&lines[line_idx], row_cols);
             self.win.addstr(&line);
         }
         self.win.attroff(COLOR_PAIR(pair as u64));
@@ -237,6 +273,9 @@ impl RuntimeUi {
         self.win.attron(COLOR_PAIR(pair as u64));
         for row in 0..h {
             let row_y = y + row;
+            if !terminal_bounds::row_is_visible(row_y, max_y) {
+                continue;
+            }
             let row_w = terminal_bounds::cols_for_printing(x, max_x, row_y, max_y).min(w);
             if row_w <= 0 {
                 continue;
@@ -277,7 +316,17 @@ impl RuntimeUi {
             let _ = curs_set(0);
             return;
         }
+        let row_y = y + line as i32;
+        if !terminal_bounds::row_is_visible(row_y, max_y) {
+            let _ = curs_set(0);
+            return;
+        }
+        let max_cols = terminal_bounds::max_element_row_cols(x, max_x, row_y, max_y, width as i32);
+        if col as i32 >= max_cols {
+            let _ = curs_set(0);
+            return;
+        }
         let _ = curs_set(1);
-        self.win.mv(y + line as i32, x + col as i32);
+        self.win.mv(row_y, x + col as i32);
     }
 }

@@ -1,5 +1,7 @@
 //! Pure logic for text input fields (cursor, selection, insert, delete, newlines).
 
+use crate::pure::text_wrap;
+
 /// Snapshot of a one-line text field, caret position, and optional selection anchor.
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub struct TextInputState {
@@ -216,6 +218,44 @@ pub fn copy_selection(state: &TextInputState) -> Option<(TextInputState, String)
 pub fn cut_selection(state: &TextInputState) -> Option<(TextInputState, String)> {
     let text = selection_text(state)?;
     Some((delete_selection(state), text))
+}
+
+/// Whether wrapped display rows fit within `max_rows`.
+pub fn state_fits_in_max_rows(state: &TextInputState, width: usize, max_rows: usize) -> bool {
+    text_wrap::display_row_count(&state.text, width) <= max_rows.max(1)
+}
+
+/// Truncate `text` so its wrapped row count does not exceed `max_rows`.
+pub fn truncate_text_to_max_rows(text: &str, width: usize, max_rows: usize) -> String {
+    let max_rows = max_rows.max(1);
+    let mut out = String::new();
+    for ch in text.chars() {
+        let mut trial = out.clone();
+        trial.push(ch);
+        if text_wrap::display_row_count(&trial, width) > max_rows {
+            break;
+        }
+        out.push(ch);
+    }
+    out
+}
+
+/// Clamp text and cursor so the field does not exceed `max_rows` display lines.
+pub fn clamp_state_to_max_rows(
+    state: &TextInputState,
+    width: usize,
+    max_rows: usize,
+) -> TextInputState {
+    if state_fits_in_max_rows(state, width, max_rows) {
+        return state.clone();
+    }
+    let text = truncate_text_to_max_rows(&state.text, width, max_rows);
+    let cursor = state.cursor.min(text.chars().count());
+    TextInputState {
+        text,
+        cursor,
+        selection_anchor: None,
+    }
 }
 
 /// Insert clipboard text at the cursor (replaces any active selection).

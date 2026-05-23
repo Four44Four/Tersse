@@ -113,7 +113,9 @@ impl RuntimeUi {
             }
             TerminalKey::Paste => {
                 if let Some(paste) = clipboard::get_text() {
-                    self.apply_text_input_state(&id, text_input::paste_text(&state, &paste));
+                    if let Some(pasted) = text_input::paste_text(&state, &paste) {
+                        self.apply_text_input_paste(&id, pasted);
+                    }
                 }
                 return true;
             }
