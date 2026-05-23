@@ -1,4 +1,5 @@
 use crate::pure::layout_reflow;
+use crate::pure::terminal_bounds;
 use crate::pure::text_wrap;
 
 use super::types::RuntimeElement;
@@ -67,16 +68,40 @@ impl RuntimeUi {
     }
 
     pub(super) fn element_render_height_by_id(&self, id: &str) -> Option<usize> {
-        self.element_by_id(id).map(Self::element_render_height)
+        self.element_by_id(id)
+            .map(|element| self.element_render_height(element))
     }
 
-    pub(super) fn element_render_height(element: &RuntimeElement) -> usize {
+    pub(super) fn element_render_height(&self, element: &RuntimeElement) -> usize {
+        let (x, y, w, h) = Self::element_clip_geometry(element);
+        let (max_y, max_x) = self.win.get_max_yx();
+        let (_, clipped_h) = terminal_bounds::clip_rect(x, y, w, h, max_x, max_y);
+        clipped_h.max(0) as usize
+    }
+
+    pub(super) fn element_clip_geometry(element: &RuntimeElement) -> (i32, i32, i32, i32) {
         match element {
-            RuntimeElement::Button(_) => render_height_for_button(),
+            RuntimeElement::Button(button) => (
+                button.button.location.x as i32,
+                button.button.location.y as i32,
+                button.button.width.max(1) as i32,
+                render_height_for_button() as i32,
+            ),
             RuntimeElement::TextInput(input) => {
-                render_height_for_text_input_text(&input.field.text, input.field.width)
+                let width = input.field.width.max(1);
+                (
+                    input.location.x as i32,
+                    input.location.y as i32,
+                    width as i32,
+                    render_height_for_text_input_text(&input.field.text, width) as i32,
+                )
             }
-            RuntimeElement::TextDisplay(display) => render_height_for_text_display(display.height),
+            RuntimeElement::TextDisplay(display) => (
+                display.location.x as i32,
+                display.location.y as i32,
+                display.width.max(1) as i32,
+                render_height_for_text_display(display.height) as i32,
+            ),
         }
     }
 
@@ -85,7 +110,7 @@ impl RuntimeUi {
         for element in &self.elements {
             self.cached_heights.insert(
                 element.id().to_string(),
-                Self::element_render_height(element),
+                self.element_render_height(element),
             );
         }
     }

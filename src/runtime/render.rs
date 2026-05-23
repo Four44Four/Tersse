@@ -66,6 +66,11 @@ impl RuntimeUi {
         let (max_y, max_x) = self.win.get_max_yx();
         let x = location.x as i32;
         let y = location.y as i32;
+        let (_, draw_h) =
+            terminal_bounds::clip_rect(x, y, width.max(1) as i32, 1, max_x, max_y);
+        if draw_h <= 0 {
+            return;
+        }
         let row_cols = terminal_bounds::cols_for_printing(x, max_x, y, max_y) as usize;
         let draw_width = width.max(1).min(row_cols);
 
@@ -112,15 +117,17 @@ impl RuntimeUi {
 
         let base_pair = self.color_pair(style.0.fg, style.0.bg);
         let selection_pair = self.color_pair(style.1.fg, style.1.bg);
+        let (max_y, max_x) = self.win.get_max_yx();
+        let x = location.x as i32;
+        let y = location.y as i32;
         let rows = text_wrap::display_row_count(&text, width) as i32;
+        let (_, draw_h) = terminal_bounds::clip_rect(x, y, width as i32, rows, max_x, max_y);
+        if draw_h <= 0 {
+            return;
+        }
+        let draw_rows = draw_h as usize;
 
-        self.fill_solid(
-            location.y as i32,
-            location.x as i32,
-            width as i32,
-            rows,
-            base_pair,
-        );
+        self.fill_solid(y, x, width as i32, draw_h, base_pair);
 
         let state = TextInputState {
             text: text.clone(),
@@ -134,6 +141,10 @@ impl RuntimeUi {
         let mut drawn = std::collections::BTreeSet::new();
         for ch in text.chars() {
             let (line, col) = text_wrap::cursor_display_position(&text, char_idx, width);
+            if line >= draw_rows {
+                char_idx += 1;
+                continue;
+            }
             if ch != '\n' {
                 let pair = if highlight_cells.contains(&(line, col)) {
                     selection_pair
@@ -153,7 +164,7 @@ impl RuntimeUi {
         }
 
         for (line, col) in highlight_cells {
-            if drawn.contains(&(line, col)) {
+            if line >= draw_rows || drawn.contains(&(line, col)) {
                 continue;
             }
             self.win.attron(COLOR_PAIR(selection_pair as u64));
@@ -254,15 +265,19 @@ impl RuntimeUi {
             return;
         }
 
-        let (line, col) = text_wrap::cursor_display_position(
-            &input.field.text,
-            input.cursor,
-            input.field.width.max(1),
-        );
+        let width = input.field.width.max(1);
+        let (line, col) =
+            text_wrap::cursor_display_position(&input.field.text, input.cursor, width);
+        let (max_y, max_x) = self.win.get_max_yx();
+        let x = input.location.x as i32;
+        let y = input.location.y as i32;
+        let rows = text_wrap::display_row_count(&input.field.text, width) as i32;
+        let (_, draw_h) = terminal_bounds::clip_rect(x, y, width as i32, rows, max_x, max_y);
+        if draw_h <= 0 || line >= draw_h as usize {
+            let _ = curs_set(0);
+            return;
+        }
         let _ = curs_set(1);
-        self.win.mv(
-            input.location.y as i32 + line as i32,
-            input.location.x as i32 + col as i32,
-        );
+        self.win.mv(y + line as i32, x + col as i32);
     }
 }

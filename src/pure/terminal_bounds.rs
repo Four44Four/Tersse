@@ -32,10 +32,15 @@ pub fn cols_for_printing(x: i32, max_x: i32, row_y: i32, max_y: i32) -> i32 {
     }
 }
 
+/// Truncate `height` so the rectangle ending at `y + height - 1` does not extend past `max_y`.
+pub fn clip_height_at_terminal(y: i32, height: i32, max_y: i32) -> i32 {
+    rows_visible_from(y, max_y).min(height).max(0)
+}
+
 /// Clip a `(width, height)` rectangle anchored at `(x, y)` to fit the terminal.
 pub fn clip_rect(x: i32, y: i32, width: i32, height: i32, max_x: i32, max_y: i32) -> (i32, i32) {
     let w = width.min(cols_visible_from(x, max_x)).max(0);
-    let h = height.min(rows_visible_from(y, max_y)).max(0);
+    let h = clip_height_at_terminal(y, height, max_y);
     if w == 0 || h == 0 {
         (0, 0)
     } else {

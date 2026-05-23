@@ -1,5 +1,6 @@
 use crate::clipboard;
 use crate::pure::scroll_view;
+use crate::pure::terminal_bounds;
 use crate::pure::text_input;
 use crate::pure::text_wrap;
 use crate::terminal_input::TerminalKey;
@@ -12,20 +13,47 @@ impl RuntimeUi {
         let Some(id) = self.current_focused_id() else {
             return false;
         };
-        let Some(RuntimeElement::TextDisplay(display)) = self.element_mut_by_id(&id) else {
+        let Some(idx) = self.idx_of(&id) else {
+            return false;
+        };
+        let Some(RuntimeElement::TextDisplay(_)) = self.elements.get(idx) else {
             return false;
         };
 
         match key {
-            TerminalKey::AltUp if display.scroll > 0 => {
+            TerminalKey::AltUp => {
+                let Some(RuntimeElement::TextDisplay(display)) = self.elements.get_mut(idx) else {
+                    return false;
+                };
+                if display.scroll == 0 {
+                    return false;
+                }
                 display.scroll = scroll_view::scroll_line_up(display.scroll);
                 true
             }
             TerminalKey::AltDown => {
-                let total =
-                    text_wrap::wrapped_line_count(&display.display.text, display.width.max(1));
-                display.scroll =
-                    scroll_view::scroll_line_down(display.scroll, total, display.height.max(1));
+                let (total, scroll, viewport_rows) = {
+                    let RuntimeElement::TextDisplay(display) = &self.elements[idx] else {
+                        return false;
+                    };
+                    let width = display.width.max(1);
+                    let total = text_wrap::wrapped_line_count(&display.display.text, width);
+                    let scroll = display.scroll;
+                    let (max_y, max_x) = self.win.get_max_yx();
+                    let (_, viewport_h) = terminal_bounds::clip_rect(
+                        display.location.x as i32,
+                        display.location.y as i32,
+                        width as i32,
+                        display.height.max(1) as i32,
+                        max_x,
+                        max_y,
+                    );
+                    (total, scroll, viewport_h.max(1) as usize)
+                };
+                let Some(RuntimeElement::TextDisplay(display)) = self.elements.get_mut(idx) else {
+                    return false;
+                };
+                display.scroll = scroll_view::scroll_line_down(scroll, total, viewport_rows);
                 true
             }
             _ => false,

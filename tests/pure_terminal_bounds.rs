@@ -1,6 +1,14 @@
 use tersse::pure::terminal_bounds::{
-    clip_rect, clip_str_to_cols, cols_for_printing, cols_visible_from, rows_visible_from,
+    clip_height_at_terminal, clip_rect, clip_str_to_cols, cols_for_printing, cols_visible_from,
+    rows_visible_from,
 };
+
+#[test]
+fn clip_height_truncates_tall_element_to_terminal_bottom() {
+    assert_eq!(clip_height_at_terminal(0, 100, 23), 24);
+    assert_eq!(clip_height_at_terminal(10, 50, 23), 14);
+    assert_eq!(clip_height_at_terminal(30, 5, 23), 0);
+}
 
 #[test]
 fn clip_rect_at_bottom_right() {

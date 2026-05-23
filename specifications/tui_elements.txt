@@ -3,3 +3,4 @@
     - Similar to tab navigation order in webpages
     - Up/Right cycle to next element
     - Down/Left cycle to previous element
+ - Do not render TUI elements beyond terminal bounds
