@@ -1,5 +1,4 @@
-use tersse::runtime::runtime_terminal_color_code;
-use tersse::Color;
+use tersse::{Color, runtime_terminal_color_code};
 
 #[test]
 fn default_color_maps_to_terminal_default_code() {

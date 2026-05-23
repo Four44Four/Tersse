@@ -3,8 +3,7 @@ mod style;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
-use tersse::runtime::{ButtonConfig, RuntimeUi, TextDisplayConfig, TextInputConfig};
-use tersse::{ElementId, ElementPlacement, Location, ParentSide};
+use tersse::prelude::*;
 
 use style::{button_style, locked_like_style, screen_title, text_input_style};
 
@@ -100,39 +99,12 @@ impl App {
         let result = build_result_text(&input);
         let _ = ui.set_text_input_lock_status(self.input_id, true);
 
-        let clear_x = label_width(PRESS_LABEL) + 1;
+        let clear_x = PRESS_LABEL.chars().count().max(1) + 1;
 
-        self.clear_id = Some(if let Some(clear_id) = self.clear_id {
-            let _ = ui.update_button(
-                clear_id,
-                ButtonConfig {
-                    label: CLEAR_LABEL.to_string(),
-                    width: label_width(CLEAR_LABEL),
-                    placement: ElementPlacement::relative_to(
-                        self.input_id,
-                        ParentSide::Bottom,
-                        Location {
-                            x: clear_x as u16,
-                            y: 0,
-                        },
-                    ),
-                    focus_number: 4.0,
-                    style: button_style(),
-                    on_press: Box::new(move |ui| {
-                        app_state
-                            .borrow_mut()
-                            .as_mut()
-                            .unwrap()
-                            .handle_clear(ui);
-                    }),
-                },
-            );
-            clear_id
-        } else {
-            ui.create_button(ButtonConfig {
-                label: CLEAR_LABEL.to_string(),
-                width: label_width(CLEAR_LABEL),
-                placement: ElementPlacement::relative_to(
+        if self.clear_id.is_none() {
+            self.clear_id = Some(ui.create_button(ButtonConfig::new(
+                CLEAR_LABEL,
+                ElementPlacement::relative_to(
                     self.input_id,
                     ParentSide::Bottom,
                     Location {
@@ -140,35 +112,35 @@ impl App {
                         y: 0,
                     },
                 ),
-                focus_number: 4.0,
-                style: button_style(),
-                on_press: Box::new(move |ui| {
+                4.0,
+                button_style(),
+                Box::new(move |ui| {
                     app_state
                         .borrow_mut()
                         .as_mut()
                         .unwrap()
                         .handle_clear(ui);
                 }),
-            })
-        });
+            )));
+        }
 
         if self.result_visible {
             if let Some(result_id) = self.result_id {
                 let _ = ui.set_text_display_text(result_id, result);
             }
         } else {
-            self.result_id = Some(ui.create_text_display(TextDisplayConfig {
-                placement: ElementPlacement::relative_to(
+            self.result_id = Some(ui.create_text_display(TextDisplayConfig::new(
+                ElementPlacement::relative_to(
                     self.press_id,
                     ParentSide::Bottom,
                     Location::default(),
                 ),
-                width: DISPLAY_WIDTH,
-                height: RESULT_HEIGHT,
-                focus_number: 5.0,
-                style: locked_like_style(),
-                initial_text: result,
-            }));
+                DISPLAY_WIDTH,
+                RESULT_HEIGHT,
+                5.0,
+                locked_like_style(),
+                result,
+            )));
             self.result_visible = true;
         }
     }
@@ -193,18 +165,18 @@ impl App {
         text: &str,
     ) -> ElementId {
         let width = text.chars().count().max(1);
-        let config = TextDisplayConfig {
-            placement: ElementPlacement::relative_to(
+        let config = TextDisplayConfig::new(
+            ElementPlacement::relative_to(
                 button_id,
                 ParentSide::Bottom,
                 Location::default(),
             ),
             width,
-            height: 1,
+            1,
             focus_number,
-            style: locked_like_style(),
-            initial_text: text.to_string(),
-        };
+            locked_like_style(),
+            text,
+        );
         if let Some(id) = display_id {
             let _ = ui.update_text_display(id, config);
             id
@@ -225,53 +197,54 @@ fn main() {
     let app: Rc<RefCell<Option<App>>> = Rc::new(RefCell::new(None));
 
     let foo_app = Rc::clone(&app);
-    let foo_id = ui.create_button(ButtonConfig {
-        label: "Foo".to_string(),
-        width: FOO_BAR_BUTTON_WIDTH,
-        placement: ElementPlacement::absolute(Location { x: 0, y: 2 }),
-        focus_number: 0.0,
-        style: button_style(),
-        on_press: Box::new(move |ui| {
+    let foo_id = ui.create_button(
+        ButtonConfig::new(
+            "Foo",
+            ElementPlacement::absolute(Location { x: 0, y: 2 }),
+            0.0,
+            button_style(),
+            Box::new(move |ui| {
             foo_app.borrow_mut().as_mut().unwrap().handle_foo(ui);
-        }),
-    });
+            }),
+        )
+        .with_width(FOO_BAR_BUTTON_WIDTH),
+    );
 
     let bar_app = Rc::clone(&app);
-    let bar_id = ui.create_button(ButtonConfig {
-        label: "Bar".to_string(),
-        width: FOO_BAR_BUTTON_WIDTH,
-        placement: ElementPlacement::absolute(Location { x: 0, y: 3 }),
-        focus_number: 1.0,
-        style: button_style(),
-        on_press: Box::new(move |ui| {
+    let bar_id = ui.create_button(
+        ButtonConfig::new(
+            "Bar",
+            ElementPlacement::absolute(Location { x: 0, y: 3 }),
+            1.0,
+            button_style(),
+            Box::new(move |ui| {
             bar_app.borrow_mut().as_mut().unwrap().handle_bar(ui);
-        }),
-    });
+            }),
+        )
+        .with_width(FOO_BAR_BUTTON_WIDTH),
+    );
 
-    let input_id = ui.create_text_input(TextInputConfig {
-        width: INPUT_WIDTH,
-        placement: ElementPlacement::absolute(Location { x: 0, y: 4 }),
-        focus_number: 2.0,
-        style: text_input_style(),
-        locked: false,
-        initial_text: String::new(),
-    });
+    let input_id = ui.create_text_input(TextInputConfig::new(
+        INPUT_WIDTH,
+        ElementPlacement::absolute(Location { x: 0, y: 4 }),
+        2.0,
+        text_input_style(),
+    ));
 
     let press_app = Rc::clone(&app);
-    let press_id = ui.create_button(ButtonConfig {
-        label: PRESS_LABEL.to_string(),
-        width: label_width(PRESS_LABEL),
-        placement: ElementPlacement::relative_to(input_id, ParentSide::Bottom, Location::default()),
-        focus_number: 3.0,
-        style: button_style(),
-        on_press: Box::new(move |ui| {
+    let press_id = ui.create_button(ButtonConfig::new(
+        PRESS_LABEL,
+        ElementPlacement::relative_to(input_id, ParentSide::Bottom, Location::default()),
+        3.0,
+        button_style(),
+        Box::new(move |ui| {
             press_app
                 .borrow_mut()
                 .as_mut()
                 .unwrap()
                 .handle_press(ui, Rc::clone(&press_app));
         }),
-    });
+    ));
 
     *app.borrow_mut() = Some(App::new(foo_id, bar_id, input_id, press_id));
 
@@ -286,10 +259,6 @@ fn main() {
             break;
         }
     }
-}
-
-fn label_width(label: &str) -> usize {
-    label.chars().count().max(1)
 }
 
 fn build_result_text(input: &str) -> String {

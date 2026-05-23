@@ -1,5 +1,4 @@
-use tersse::runtime::{FocusStyle, Style, TextInputStyle};
-use tersse::{set_title_of_current_screen, Color, ScreenTitle, TitleAlignment};
+use tersse::{Color, FocusStyle, ScreenTitle, Style, TextInputStyle, TitleAlignment, set_title_of_current_screen};
 
 pub fn screen_title() -> ScreenTitle {
     set_title_of_current_screen(

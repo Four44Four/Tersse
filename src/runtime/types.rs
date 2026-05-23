@@ -67,6 +67,83 @@ pub enum UiEvent {
 
 pub type ButtonHandler = Box<dyn FnMut(&mut RuntimeUi) + 'static>;
 
+fn label_width(label: &str) -> usize {
+    label.chars().count().max(1)
+}
+
+impl ButtonConfig {
+    pub fn new(
+        label: impl Into<String>,
+        placement: ElementPlacement,
+        focus_number: f64,
+        style: FocusStyle,
+        on_press: ButtonHandler,
+    ) -> Self {
+        let label = label.into();
+        Self {
+            width: label_width(&label),
+            label,
+            placement,
+            focus_number,
+            style,
+            on_press,
+        }
+    }
+
+    pub fn with_width(mut self, width: usize) -> Self {
+        self.width = width.max(1);
+        self
+    }
+}
+
+impl TextInputConfig {
+    pub fn new(
+        width: usize,
+        placement: ElementPlacement,
+        focus_number: f64,
+        style: TextInputStyle,
+    ) -> Self {
+        Self {
+            width: width.max(1),
+            placement,
+            focus_number,
+            style,
+            locked: false,
+            initial_text: String::new(),
+        }
+    }
+
+    pub fn with_lock_status(mut self, locked: bool) -> Self {
+        self.locked = locked;
+        self
+    }
+
+    pub fn with_initial_text(mut self, initial_text: impl Into<String>) -> Self {
+        self.initial_text = initial_text.into();
+        self
+    }
+}
+
+impl TextDisplayConfig {
+    pub fn new(
+        placement: ElementPlacement,
+        width: usize,
+        height: usize,
+        focus_number: f64,
+        style: FocusStyle,
+        initial_text: impl Into<String>,
+    ) -> Self {
+        Self {
+            placement,
+            width: width.max(1),
+            height: height.max(1),
+            focus_number,
+            style,
+            initial_text: initial_text.into(),
+        }
+    }
+}
+
 pub(super) struct ButtonElement {
     pub id: usize,
     pub focus_number: f64,

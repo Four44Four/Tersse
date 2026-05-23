@@ -1,0 +1,3 @@
+ - Only expose UI element creation, deletion, property modification (text display, color, position, size), focus number changing, focused element changing, lock status, etc...
+ - Do not expose any internal constants, keyboard processing/input logic, ID allocation logic, and other mechanisms that are not directly relevant to UI flow
+    - Keep clipboard API exposed

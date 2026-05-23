@@ -24,8 +24,6 @@ pub use types::{
     TextInputConfig, TextInputStyle, UiEvent,
 };
 
-pub use crate::{ElementPlacement, ParentSide};
-
 use element_store::ElementStore;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

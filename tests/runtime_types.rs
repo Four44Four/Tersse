@@ -1,4 +1,4 @@
-use tersse::runtime::{
+use tersse::{
     runtime_clamp_text_display_dimensions, runtime_text_input_state_snapshot,
 };
 

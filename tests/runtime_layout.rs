@@ -1,4 +1,4 @@
-use tersse::runtime::{
+use tersse::{
     runtime_render_height_for_button, runtime_render_height_for_text_display,
     runtime_render_height_for_text_input_text,
 };

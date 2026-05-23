@@ -6,6 +6,10 @@ description = "Cross-platform curses TUI"
 license = "MIT OR Apache-2.0"
 build = "build.rs"
 
+[features]
+default = ["pure-tests"]
+pure-tests = []
+
 [dependencies]
 arboard = "3"
 crossterm = "0.28"

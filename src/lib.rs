@@ -1,16 +1,31 @@
 //! Public API for building and styling TUI elements.
 
 pub mod clipboard;
-pub mod constants;
-pub mod element_store;
+mod constants;
+mod element_store;
+#[cfg(feature = "pure-tests")]
 pub mod pure;
-pub mod runtime;
-pub mod terminal_input;
+#[cfg(not(feature = "pure-tests"))]
+mod pure;
+mod runtime;
+mod terminal_input;
 
 pub use element_store::{ElementId, ElementStore, StoredElement};
-
-pub use constants::TERM_RESIZE_DEBOUNCE_MS;
 pub use pure::element_placement::{ElementBounds, ElementPlacement, ParentSide};
+pub use runtime::{
+    ButtonConfig, ButtonHandler, ElementConfig, FocusStyle, RuntimeUi, Style, TextDisplayConfig,
+    TextInputConfig, TextInputStyle, UiEvent, runtime_clamp_text_display_dimensions,
+    runtime_render_height_for_button, runtime_render_height_for_text_display,
+    runtime_render_height_for_text_input_text, runtime_terminal_color_code,
+    runtime_text_input_state_snapshot,
+};
+
+pub mod prelude {
+    pub use crate::{
+        ButtonConfig, Color, ElementId, ElementPlacement, FocusStyle, Location, ParentSide,
+        RuntimeUi, Style, TextDisplayConfig, TextInputConfig, TextInputStyle,
+    };
+}
 
 use std::error::Error;
 use std::fmt::{Display, Formatter};
