@@ -1,11 +1,14 @@
+mod style;
+
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
-use tersse::runtime::{
-    ButtonConfig, ElementConfig, FocusStyle, RuntimeUi, Style, TextDisplayConfig, TextInputConfig,
-    TextInputStyle,
+use tersse::runtime::{ButtonConfig, ElementConfig, RuntimeUi, TextDisplayConfig, TextInputConfig};
+use tersse::Location;
+
+use style::{
+    button_style, locked_like_style, neutral_display_style, screen_title, text_input_style,
 };
-use tersse::{set_title_of_current_screen, Color, Location, TitleAlignment};
 
 const POLL_TIMEOUT_MS: u64 = 50;
 const FLASH_FOO: Duration = Duration::from_secs(2);
@@ -155,12 +158,7 @@ impl App {
 fn main() {
     let mut ui = RuntimeUi::new();
     let app = Rc::new(RefCell::new(App::new()));
-    ui.set_title(set_title_of_current_screen(
-        "Hello world",
-        TitleAlignment::Left,
-        Color::rgb(255, 255, 255),
-        Color::rgb(0, 0, 0),
-    ));
+    ui.set_title(screen_title());
 
     let foo_app = Rc::clone(&app);
     ui.upsert_button(ButtonConfig {
@@ -228,68 +226,4 @@ fn label_width(label: &str) -> usize {
 fn build_result_text(input: &str) -> String {
     let reversed = input.chars().rev().collect::<String>();
     reversed.repeat(10)
-}
-
-fn button_style() -> FocusStyle {
-    FocusStyle {
-        focused: Style {
-            fg: Color::rgb(0, 0, 0),
-            bg: Color::rgb(0, 255, 255),
-        },
-        unfocused: Style {
-            fg: Color::rgb(255, 255, 255),
-            bg: Color::rgb(0, 0, 255),
-        },
-    }
-}
-
-fn locked_like_style() -> FocusStyle {
-    FocusStyle {
-        focused: Style {
-            fg: Color::rgb(255, 0, 0),
-            bg: Color::rgb(255, 255, 255),
-        },
-        unfocused: Style {
-            fg: Color::rgb(255, 255, 0),
-            bg: Color::rgb(0, 0, 0),
-        },
-    }
-}
-
-fn neutral_display_style() -> FocusStyle {
-    FocusStyle {
-        focused: Style {
-            fg: Color::rgb(255, 255, 255),
-            bg: Color::rgb(0, 0, 0),
-        },
-        unfocused: Style {
-            fg: Color::rgb(255, 255, 255),
-            bg: Color::rgb(0, 0, 0),
-        },
-    }
-}
-
-fn text_input_style() -> TextInputStyle {
-    TextInputStyle {
-        focused_unlocked: Style {
-            fg: Color::rgb(0, 0, 0),
-            bg: Color::rgb(255, 255, 255),
-        },
-        unfocused_unlocked: Style {
-            fg: Color::rgb(255, 255, 255),
-            bg: Color::rgb(0, 0, 0),
-        },
-        focused_locked: Style {
-            fg: Color::rgb(255, 0, 0),
-            bg: Color::rgb(255, 255, 255),
-        },
-        unfocused_locked: Style {
-            fg: Color::rgb(255, 255, 0),
-            bg: Color::rgb(0, 0, 0),
-        },
-        selection: Style {
-            fg: Color::rgb(255, 255, 255),
-            bg: Color::rgb(0, 0, 0),
-        },
-    }
 }

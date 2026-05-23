@@ -926,8 +926,8 @@ impl RuntimeUi {
     }
 
     fn color_pair(&mut self, fg: Color, bg: Color) -> i16 {
-        let fg_code = nearest_terminal_color(fg);
-        let bg_code = nearest_terminal_color(bg);
+        let fg_code = terminal_color_code(fg);
+        let bg_code = terminal_color_code(bg);
         let key = (fg_code, bg_code);
         if let Some(pair) = self.pair_cache.get(&key) {
             return *pair;
@@ -1031,29 +1031,16 @@ impl Drop for RuntimeUi {
     }
 }
 
-fn nearest_terminal_color(color: Color) -> i16 {
-    const BASE: [(i16, (u8, u8, u8)); 8] = [
-        (pancurses::COLOR_BLACK, (0, 0, 0)),
-        (pancurses::COLOR_RED, (205, 49, 49)),
-        (pancurses::COLOR_GREEN, (13, 188, 121)),
-        (pancurses::COLOR_YELLOW, (229, 229, 16)),
-        (pancurses::COLOR_BLUE, (36, 114, 200)),
-        (pancurses::COLOR_MAGENTA, (188, 63, 188)),
-        (pancurses::COLOR_CYAN, (17, 168, 205)),
-        (pancurses::COLOR_WHITE, (229, 229, 229)),
-    ];
-
-    let mut best = BASE[0].0;
-    let mut best_distance = u32::MAX;
-    for (code, (r, g, b)) in BASE {
-        let dr = color.r as i32 - r as i32;
-        let dg = color.g as i32 - g as i32;
-        let db = color.b as i32 - b as i32;
-        let distance = (dr * dr + dg * dg + db * db) as u32;
-        if distance < best_distance {
-            best_distance = distance;
-            best = code;
-        }
+fn terminal_color_code(color: Color) -> i16 {
+    match color {
+        Color::Default => -1,
+        Color::Black => pancurses::COLOR_BLACK,
+        Color::Red => pancurses::COLOR_RED,
+        Color::Green => pancurses::COLOR_GREEN,
+        Color::Yellow => pancurses::COLOR_YELLOW,
+        Color::Blue => pancurses::COLOR_BLUE,
+        Color::Magenta => pancurses::COLOR_MAGENTA,
+        Color::Cyan => pancurses::COLOR_CYAN,
+        Color::White => pancurses::COLOR_WHITE,
     }
-    best
 }

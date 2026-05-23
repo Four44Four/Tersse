@@ -8,17 +8,20 @@ pub mod runtime;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 
+/// Standard curses terminal colors (8-color palette plus terminal default).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
-pub struct Color {
-    pub r: u8,
-    pub g: u8,
-    pub b: u8,
-}
-
-impl Color {
-    pub const fn rgb(r: u8, g: u8, b: u8) -> Self {
-        Self { r, g, b }
-    }
+pub enum Color {
+    /// Terminal default foreground or background (`-1` in curses).
+    #[default]
+    Default,
+    Black,
+    Red,
+    Green,
+    Yellow,
+    Blue,
+    Magenta,
+    Cyan,
+    White,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
@@ -312,19 +315,19 @@ pub fn set_title_of_current_screen(
 }
 
 fn default_non_focused_non_locked_bg_color() -> Color {
-    Color::rgb(0, 0, 0)
+    Color::Black
 }
 
 fn default_non_focused_non_locked_fg_color() -> Color {
-    Color::rgb(255, 255, 255)
+    Color::White
 }
 
 fn default_non_focused_locked_bg_color() -> Color {
-    Color::rgb(35, 35, 35)
+    Color::Default
 }
 
 fn default_non_focused_locked_fg_color() -> Color {
-    Color::rgb(200, 200, 200)
+    Color::Yellow
 }
 
 fn set_element_focus(element: &mut Element, focused: bool) {
