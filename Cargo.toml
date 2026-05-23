@@ -1,8 +1,8 @@
 [package]
-name = "agents_4_agents"
+name = "tersse"
 version = "0.1.0"
 edition = "2021"
-description = "Cross-platform curses TUI demo (Hello world + Foo/Bar buttons)"
+description = "Cross-platform curses TUI"
 license = "MIT OR Apache-2.0"
 build = "build.rs"
 
@@ -24,3 +24,7 @@ pancurses = "0.17"
 [profile.release]
 lto = true
 strip = true
+
+[[bin]]
+name = "basic_example"
+path = "example/basic/main.rs"

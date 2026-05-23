@@ -20,6 +20,10 @@
     - Deactivate the text selection
     - Do nothing to the selected text
     - Cursor will move to the intended text position as if there was no selection active prior
+ - If a text input field is currently focused: 
+    - All keys except for Up/Down arrow keys will insert their appropriate characters
+    - For example:
+       - Pressing q key will insert a literal q character at the current text cursor position
  - Do the following when the specified Ctrl+* keys are pressed and there is active selected text:
     - Ctrl+c -> {
         - Copy text to system clipboard
