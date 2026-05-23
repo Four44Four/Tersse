@@ -1,4 +1,6 @@
-//! Word-wrap and caret-to-cell mapping for multi-line text display.
+//! Word-wrap, caret-to-cell mapping, and selection highlighting for multi-line text display.
+
+use std::collections::BTreeSet;
 
 /// Split `text` into display lines of at most `width` characters (hard wrap; `\n` starts a new line).
 pub fn wrapped_lines(text: &str, width: usize) -> Vec<String> {
@@ -34,7 +36,8 @@ pub fn display_row_count(text: &str, width: usize) -> usize {
     if text.is_empty() {
         1
     } else {
-        wrapped_line_count(text, width).max(1)
+        let (line, _) = cursor_display_position(text, text.chars().count(), width);
+        line + 1
     }
 }
 
@@ -63,6 +66,47 @@ pub fn cursor_display_position(text: &str, cursor: usize, width: usize) -> (usiz
     (line, col)
 }
 
+/// Display cells `(line, col)` that should show the text selection highlight.
+/// When a newline in the selection range is included, extends through the rest of that visual line.
+pub fn selection_highlight_cells(
+    text: &str,
+    selection: Option<(usize, usize)>,
+    width: usize,
+) -> BTreeSet<(usize, usize)> {
+    let width = width.max(1);
+    let mut cells = BTreeSet::new();
+    let Some((start, end)) = selection else {
+        return cells;
+    };
+
+    let mut line = 0usize;
+    let mut col = 0usize;
+    let mut idx = 0usize;
+    for ch in text.chars() {
+        if idx >= start && idx < end {
+            if ch == '\n' {
+                for c in col..width {
+                    cells.insert((line, c));
+                }
+            } else {
+                cells.insert((line, col));
+            }
+        }
+        if ch == '\n' {
+            line += 1;
+            col = 0;
+        } else {
+            col += 1;
+            if col >= width {
+                line += 1;
+                col = 0;
+            }
+        }
+        idx += 1;
+    }
+    cells
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -82,5 +126,25 @@ mod tests {
     fn empty_display_rows() {
         assert_eq!(display_row_count("", 48), 1);
         assert_eq!(display_row_count("hello", 48), 1);
+    }
+
+    #[test]
+    fn display_rows_after_explicit_newline() {
+        assert_eq!(display_row_count("hello\n", 48), 2);
+        assert_eq!(display_row_count("a\nb", 48), 2);
+    }
+
+    #[test]
+    fn newline_selection_extends_to_line_end() {
+        let cells = selection_highlight_cells("hi\nthere", Some((2, 3)), 10);
+        assert!(cells.contains(&(0, 2)));
+        assert!(cells.contains(&(0, 9)));
+        assert!(!cells.contains(&(1, 0)));
+    }
+
+    #[test]
+    fn regular_selection_does_not_extend_past_chars() {
+        let cells = selection_highlight_cells("hi\nthere", Some((0, 2)), 10);
+        assert_eq!(cells, BTreeSet::from([(0, 0), (0, 1)]));
     }
 }

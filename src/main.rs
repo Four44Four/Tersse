@@ -441,23 +441,36 @@ fn draw_ai_input(
         selection_anchor,
     };
     let selection = text_input::selection_range(&input_state);
+    let highlight_cells = text_wrap::selection_highlight_cells(text, selection, width);
 
     let mut char_index = 0usize;
+    let mut drawn_cells = std::collections::BTreeSet::new();
     for ch in text.chars() {
         let (line, col) = text_wrap::cursor_display_position(text, char_index, width);
-        let selected = selection
-            .map(|(start, end)| char_index >= start && char_index < end)
-            .unwrap_or(false);
-        let ch_pair = if selected {
-            PAIR_TEXT_INPUT_SELECT
-        } else {
-            pair
-        };
-        win.attron(COLOR_PAIR(ch_pair));
-        win.mv(y + line as i32, COL_BTN + col as i32);
-        win.addch(ch);
-        win.attroff(COLOR_PAIR(ch_pair));
+        if ch != '\n' {
+            let selected = highlight_cells.contains(&(line, col));
+            let ch_pair = if selected {
+                PAIR_TEXT_INPUT_SELECT
+            } else {
+                pair
+            };
+            win.attron(COLOR_PAIR(ch_pair));
+            win.mv(y + line as i32, COL_BTN + col as i32);
+            win.addch(ch);
+            win.attroff(COLOR_PAIR(ch_pair));
+            drawn_cells.insert((line, col));
+        }
         char_index += 1;
+    }
+
+    for (line, col) in highlight_cells {
+        if drawn_cells.contains(&(line, col)) {
+            continue;
+        }
+        win.attron(COLOR_PAIR(PAIR_TEXT_INPUT_SELECT));
+        win.mv(y + line as i32, COL_BTN + col as i32);
+        win.addch(' ');
+        win.attroff(COLOR_PAIR(PAIR_TEXT_INPUT_SELECT));
     }
 }
 
@@ -610,6 +623,13 @@ fn handle_tab_in_input(app: &mut App) {
     );
 }
 
+fn handle_enter_in_input(app: &mut App) {
+    apply_ai_input(
+        app,
+        text_input::insert_newline(&ai_input_state(app)),
+    );
+}
+
 fn handle_copy(app: &mut App) {
     if let Some((state, text)) = text_input::copy_selection(&ai_input_state(app)) {
         if clipboard::set_text(&text) {
@@ -666,7 +686,9 @@ fn main() {
                 app.quit = true;
             }
             Some(TerminalKey::Enter) => {
-                if !(app.focus == Focus::AiInput && !app.ai_input_locked) {
+                if ai_input_editing(&app) {
+                    handle_enter_in_input(&mut app);
+                } else {
                     app.activate_focused();
                 }
             }

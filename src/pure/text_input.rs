@@ -1,4 +1,4 @@
-//! Pure logic for single-line text input fields (cursor, selection, insert, delete).
+//! Pure logic for text input fields (cursor, selection, insert, delete, newlines).
 
 /// Snapshot of a one-line text field, caret position, and optional selection anchor.
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
@@ -173,6 +173,22 @@ pub fn insert_tab(state: &TextInputState) -> Option<TextInputState> {
     insert_char(state, '\t')
 }
 
+/// Insert a line break at the cursor (replaces any selection). Text after the cursor moves to the next line.
+pub fn insert_newline(state: &TextInputState) -> Option<TextInputState> {
+    let base = if state.has_selection() {
+        delete_selection(state)
+    } else {
+        state.clone()
+    };
+    let mut text = base.text;
+    insert_char_at(&mut text, base.cursor, '\n');
+    Some(TextInputState {
+        text,
+        cursor: base.cursor + 1,
+        selection_anchor: None,
+    })
+}
+
 /// Selected substring, if any.
 pub fn selection_text(state: &TextInputState) -> Option<String> {
     let (start, end) = selection_range(state)?;
@@ -211,7 +227,7 @@ pub fn paste_text(state: &TextInputState, paste: &str) -> Option<TextInputState>
     };
     let mut text = base.text;
     let mut cursor = base.cursor;
-    for c in paste.chars().filter(|c| !c.is_control() || *c == '\t') {
+    for c in paste.chars().filter(|c| !c.is_control() || *c == '\t' || *c == '\n') {
         insert_char_at(&mut text, cursor, c);
         cursor += 1;
     }
@@ -289,5 +305,29 @@ mod tests {
         let next = paste_text(&s, "X").unwrap();
         assert_eq!(next.text, "hXo");
         assert_eq!(next.cursor, 2);
+    }
+
+    #[test]
+    fn insert_newline_splits_text() {
+        let s = state("helloworld", 5, None);
+        let next = insert_newline(&s).unwrap();
+        assert_eq!(next.text, "hello\nworld");
+        assert_eq!(next.cursor, 6);
+    }
+
+    #[test]
+    fn insert_newline_replaces_selection() {
+        let s = state("hello", 4, Some(1));
+        let next = insert_newline(&s).unwrap();
+        assert_eq!(next.text, "h\no");
+        assert_eq!(next.cursor, 2);
+    }
+
+    #[test]
+    fn paste_includes_newlines() {
+        let s = state("ab", 1, None);
+        let next = paste_text(&s, "X\nY").unwrap();
+        assert_eq!(next.text, "aX\nYb");
+        assert_eq!(next.cursor, 4);
     }
 }
