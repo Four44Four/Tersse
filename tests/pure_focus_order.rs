@@ -5,12 +5,12 @@ use tersse::pure::focus_order::{
 #[test]
 fn sorted_ids_uses_focus_then_id() {
     let sorted = sorted_ids(vec![
-        (2.0, "z".to_string()),
-        (0.0, "b".to_string()),
-        (0.0, "a".to_string()),
-        (1.0, "m".to_string()),
+        (2.0, 3),
+        (0.0, 1),
+        (0.0, 0),
+        (1.0, 2),
     ]);
-    assert_eq!(sorted, vec!["a", "b", "m", "z"]);
+    assert_eq!(sorted, vec![0, 1, 2, 3]);
 }
 
 #[test]
@@ -29,21 +29,21 @@ fn next_index_wraps_like_right_or_down_navigation() {
 
 #[test]
 fn index_for_focused_id_tracks_same_element_after_list_changes() {
-    let order = vec!["a", "b", "c"];
-    assert_eq!(index_for_focused_id(&order, Some("b"), 0), 1);
-    assert_eq!(index_for_focused_id(&order, Some("c"), 0), 2);
+    let order = vec![0, 1, 2];
+    assert_eq!(index_for_focused_id(&order, Some(1), 0), 1);
+    assert_eq!(index_for_focused_id(&order, Some(2), 0), 2);
 
-    let after_remove_a = vec!["b", "c"];
-    assert_eq!(index_for_focused_id(&after_remove_a, Some("c"), 2), 1);
+    let after_remove_a = vec![1, 2];
+    assert_eq!(index_for_focused_id(&after_remove_a, Some(2), 2), 1);
 
-    let after_insert = vec!["x", "a", "b", "c"];
-    assert_eq!(index_for_focused_id(&after_insert, Some("b"), 1), 2);
+    let after_insert = vec![9, 0, 1, 2];
+    assert_eq!(index_for_focused_id(&after_insert, Some(1), 1), 2);
 }
 
 #[test]
 fn index_for_focused_id_falls_back_when_focused_id_is_gone() {
-    let order = vec!["a", "c"];
-    assert_eq!(index_for_focused_id(&order, Some("b"), 1), 1);
+    let order = vec![0, 2];
+    assert_eq!(index_for_focused_id(&order, Some(1), 1), 1);
     assert_eq!(index_for_focused_id(&order, None, 0), 0);
 }
 

@@ -19,12 +19,12 @@ impl RuntimeUi {
             self.draw_title(title.clone());
         }
 
-        let draw_order: Vec<String> = self.elements.focus_order_ids();
+        let draw_order: Vec<usize> = self.elements.focus_order_ids();
         for id in draw_order {
-            match self.elements.get(&id) {
-                Some(RuntimeElement::Button(_)) => self.draw_button(&id),
-                Some(RuntimeElement::TextInput(_)) => self.draw_text_input(&id),
-                Some(RuntimeElement::TextDisplay(_)) => self.draw_text_display(&id),
+            match self.elements.get(id) {
+                Some(RuntimeElement::Button(_)) => self.draw_button(id),
+                Some(RuntimeElement::TextInput(_)) => self.draw_text_input(id),
+                Some(RuntimeElement::TextDisplay(_)) => self.draw_text_display(id),
                 None => {}
             }
         }
@@ -52,7 +52,7 @@ impl RuntimeUi {
         self.win.attroff(COLOR_PAIR(pair as u64));
     }
 
-    fn draw_button(&mut self, id: &str) {
+    fn draw_button(&mut self, id: usize) {
         let (location, text, width, style) = match self.elements.get(id) {
             Some(RuntimeElement::Button(button)) => {
                 let style = if button.button.focused {
@@ -98,7 +98,7 @@ impl RuntimeUi {
         self.win.attroff(COLOR_PAIR(pair as u64));
     }
 
-    fn draw_text_input(&mut self, id: &str) {
+    fn draw_text_input(&mut self, id: usize) {
         let (location, width, text, cursor, selection_anchor, style) = match self.elements.get(id) {
             Some(RuntimeElement::TextInput(input)) => {
                 let style = if input.field.locked {
@@ -218,7 +218,7 @@ impl RuntimeUi {
         }
     }
 
-    fn draw_text_display(&mut self, id: &str) {
+    fn draw_text_display(&mut self, id: usize) {
         let (location, width, height, text, scroll, style) = match self.elements.get(id) {
             Some(RuntimeElement::TextDisplay(display)) => {
                 let style = if display.display.focused {
@@ -318,7 +318,7 @@ impl RuntimeUi {
             return;
         };
 
-        let Some(RuntimeElement::TextInput(input)) = self.element_by_id(&focused_id) else {
+        let Some(RuntimeElement::TextInput(input)) = self.element_by_id(focused_id) else {
             let _ = curs_set(0);
             return;
         };

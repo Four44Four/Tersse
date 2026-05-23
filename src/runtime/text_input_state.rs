@@ -1,10 +1,11 @@
 use crate::pure::text_input::TextInputState;
+use crate::ElementId;
 
 use super::types::RuntimeElement;
 use super::RuntimeUi;
 
 impl RuntimeUi {
-    pub(super) fn text_input_state(&self, id: &str) -> TextInputState {
+    pub(super) fn text_input_state(&self, id: ElementId) -> TextInputState {
         self.element_by_id(id)
             .and_then(RuntimeElement::text_input_state)
             .unwrap_or(TextInputState {
@@ -14,17 +15,17 @@ impl RuntimeUi {
             })
     }
 
-    pub(super) fn apply_text_input_state(&mut self, id: &str, state: Option<TextInputState>) {
+    pub(super) fn apply_text_input_state(&mut self, id: ElementId, state: Option<TextInputState>) {
         if let Some(state) = state {
             self.set_text_input_state(id, state);
         }
     }
 
-    pub(super) fn apply_text_input_paste(&mut self, id: &str, state: TextInputState) {
+    pub(super) fn apply_text_input_paste(&mut self, id: ElementId, state: TextInputState) {
         self.set_text_input_state(id, state);
     }
 
-    pub(super) fn set_text_input_state(&mut self, id: &str, state: TextInputState) {
+    pub(super) fn set_text_input_state(&mut self, id: ElementId, state: TextInputState) {
         if let Some(RuntimeElement::TextInput(input)) = self.element_mut_by_id(id) {
             input.field.text = state.text;
             input.cursor = state.cursor;

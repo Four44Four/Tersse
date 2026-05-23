@@ -40,7 +40,7 @@ impl RuntimeUi {
                 };
                 let height = self
                     .cached_heights
-                    .get(element.id())
+                    .get(&element.id())
                     .copied()
                     .unwrap_or(1);
                 (y, height)

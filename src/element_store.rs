@@ -1,91 +1,134 @@
-//! Focus-ordered storage for public [`crate::Element`] values.
+//! Element storage with O(1) id access and O(log n) focus traversal.
 
-use std::collections::{BTreeMap, HashMap};
-
-use crate::pure::focus_key::FocusKey;
-use crate::pure::focus_store::{btree_get, btree_get_mut, btree_rekey, btree_remove, btree_upsert};
+use crate::pure::element_id::allocate_element_id;
+use crate::pure::focus_store::IndexedFocusStore;
 use crate::Element;
+
+/// Opaque handle for an element assigned by the store.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct ElementId(usize);
+
+impl ElementId {
+    pub(crate) fn from_internal(id: usize) -> Self {
+        Self(id)
+    }
+
+    pub(crate) fn as_internal(self) -> usize {
+        self.0
+    }
+}
 
 /// A TUI element with stable id and focus-order key.
 pub struct StoredElement {
-    pub id: String,
+    id: usize,
     pub focus_number: f64,
     pub element: Element,
 }
 
 impl StoredElement {
-    pub fn new(id: impl Into<String>, focus_number: f64, element: Element) -> Self {
+    pub(crate) fn new(id: usize, focus_number: f64, element: Element) -> Self {
         Self {
-            id: id.into(),
+            id,
             focus_number,
             element,
         }
     }
 
-    pub fn id(&self) -> &str {
-        &self.id
+    pub fn id(&self) -> ElementId {
+        ElementId::from_internal(self.id)
     }
 }
 
-/// Elements sorted by `(focus_number, id)` with `O(log n)` insert, delete, and reorder.
+/// Elements keyed by id with focus-order indexing.
 #[derive(Default)]
 pub struct ElementStore {
-    by_key: BTreeMap<FocusKey, StoredElement>,
-    id_to_key: HashMap<String, FocusKey>,
+    store: IndexedFocusStore<StoredElement>,
+    next_element_id: usize,
 }
 
 impl ElementStore {
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            store: IndexedFocusStore::new(),
+            next_element_id: 0,
+        }
     }
 
     pub fn len(&self) -> usize {
-        self.by_key.len()
+        self.store.len()
     }
 
     pub fn is_empty(&self) -> bool {
-        self.by_key.is_empty()
+        self.store.is_empty()
     }
 
-    pub fn upsert(&mut self, stored: StoredElement) {
-        let key = FocusKey::new(stored.focus_number, &stored.id);
-        btree_upsert(&mut self.by_key, &mut self.id_to_key, key, stored);
+    fn allocate_id(&mut self) -> usize {
+        loop {
+            let id = allocate_element_id(&mut self.next_element_id);
+            if !self.store.contains_id(id) {
+                return id;
+            }
+        }
     }
 
-    pub fn remove(&mut self, id: &str) -> Option<StoredElement> {
-        btree_remove(&mut self.by_key, &mut self.id_to_key, id)
+    fn upsert_at(&mut self, id: usize, focus_number: f64, element: Element) {
+        self.store
+            .upsert(id, focus_number, StoredElement::new(id, focus_number, element));
     }
 
-    pub fn set_focus_number(&mut self, id: &str, focus_number: f64) -> bool {
-        if !btree_rekey(&mut self.by_key, &mut self.id_to_key, id, focus_number) {
+    /// Inserts a new element and returns its assigned id.
+    pub fn insert(&mut self, focus_number: f64, element: Element) -> ElementId {
+        let id = self.allocate_id();
+        self.upsert_at(id, focus_number, element);
+        ElementId::from_internal(id)
+    }
+
+    /// Replaces an existing element's data without changing its id.
+    pub fn update(&mut self, id: ElementId, focus_number: f64, element: Element) -> bool {
+        if !self.store.contains_id(id.as_internal()) {
             return false;
         }
-        if let Some(stored) = btree_get_mut(&mut self.by_key, &self.id_to_key, id) {
-            stored.focus_number = focus_number;
-        }
+        self.upsert_at(id.as_internal(), focus_number, element);
         true
     }
 
-    pub fn get(&self, id: &str) -> Option<&StoredElement> {
-        btree_get(&self.by_key, &self.id_to_key, id)
+    pub fn remove(&mut self, id: ElementId) -> Option<StoredElement> {
+        self.store.remove(id.as_internal())
     }
 
-    pub fn get_mut(&mut self, id: &str) -> Option<&mut StoredElement> {
-        btree_get_mut(&mut self.by_key, &mut self.id_to_key, id)
+    pub fn set_focus_number(&mut self, id: ElementId, focus_number: f64) -> bool {
+        self.store
+            .set_focus_number(id.as_internal(), focus_number, |stored, next| {
+                stored.focus_number = next;
+            })
+    }
+
+    pub fn get(&self, id: ElementId) -> Option<&StoredElement> {
+        self.store.get(id.as_internal())
+    }
+
+    pub fn get_mut(&mut self, id: ElementId) -> Option<&mut StoredElement> {
+        self.store.get_mut(id.as_internal())
     }
 
     pub fn iter(&self) -> impl Iterator<Item = &StoredElement> {
-        self.by_key.values()
+        self.store.iter()
     }
 
     pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut StoredElement> {
-        self.by_key.values_mut()
+        self.store.iter_mut()
     }
 
-    pub fn focus_order_ids(&self) -> Vec<String> {
-        self.by_key
-            .values()
-            .map(|stored| stored.id.clone())
+    pub fn focus_order_ids(&self) -> Vec<ElementId> {
+        self.store
+            .focus_order_ids()
+            .into_iter()
+            .map(ElementId::from_internal)
             .collect()
+    }
+
+    #[cfg(debug_assertions)]
+    pub fn set_next_element_id_for_tests(&mut self, next_element_id: usize) {
+        self.next_element_id = next_element_id;
     }
 }

@@ -7,7 +7,7 @@ pub mod pure;
 pub mod runtime;
 pub mod terminal_input;
 
-pub use element_store::{ElementStore, StoredElement};
+pub use element_store::{ElementId, ElementStore, StoredElement};
 
 pub use constants::TERM_RESIZE_DEBOUNCE_MS;
 pub use pure::element_placement::{ElementBounds, ElementPlacement, ParentSide};
@@ -90,12 +90,12 @@ pub enum Element {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum FocusError {
-    IdNotFound { id: String },
+    IdNotFound { id: ElementId },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum DeleteElementError {
-    IdNotFound { id: String },
+    IdNotFound { id: ElementId },
     NoFocusedElement,
 }
 
@@ -183,14 +183,13 @@ pub fn create_text_display_element(initial_text: impl Into<String>) -> TextDispl
 }
 
 /// Forces focus onto exactly one element by id.
-pub fn force_focus_on_element(store: &mut ElementStore, id: &str) -> Result<(), FocusError> {
+pub fn force_focus_on_element(store: &mut ElementStore, id: ElementId) -> Result<(), FocusError> {
     if store.get(id).is_none() {
-        return Err(FocusError::IdNotFound {
-            id: id.to_string(),
-        });
+        return Err(FocusError::IdNotFound { id });
     }
     for stored in store.iter_mut() {
-        set_element_focus(&mut stored.element, stored.id == id);
+        let is_focused = stored.id() == id;
+        set_element_focus(&mut stored.element, is_focused);
     }
     Ok(())
 }
@@ -198,11 +197,11 @@ pub fn force_focus_on_element(store: &mut ElementStore, id: &str) -> Result<(), 
 /// Deletes a TUI element by id and returns the removed entry.
 pub fn delete_tui_element(
     store: &mut ElementStore,
-    id: &str,
+    id: ElementId,
 ) -> Result<StoredElement, DeleteElementError> {
-    store.remove(id).ok_or_else(|| DeleteElementError::IdNotFound {
-        id: id.to_string(),
-    })
+    store
+        .remove(id)
+        .ok_or(DeleteElementError::IdNotFound { id })
 }
 
 /// Deletes the currently focused TUI element and returns it.
@@ -212,11 +211,11 @@ pub fn delete_focused_tui_element(
     let focused_id = store
         .iter()
         .find(|stored| element_is_focused(&stored.element))
-        .map(|stored| stored.id.clone());
+        .map(|stored| stored.id());
     let Some(id) = focused_id else {
         return Err(DeleteElementError::NoFocusedElement);
     };
-    store.remove(&id).ok_or(DeleteElementError::NoFocusedElement)
+    store.remove(id).ok_or(DeleteElementError::NoFocusedElement)
 }
 
 /// Changes background color of non-focused, non-locked text input field elements.

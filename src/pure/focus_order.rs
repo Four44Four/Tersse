@@ -1,5 +1,5 @@
 /// Returns element ids sorted by `(focus_number, id)`.
-pub fn sorted_ids(mut entries: Vec<(f64, String)>) -> Vec<String> {
+pub fn sorted_ids(mut entries: Vec<(f64, usize)>) -> Vec<usize> {
     entries.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
     entries.into_iter().map(|(_, id)| id).collect()
 }
@@ -9,12 +9,12 @@ pub fn sorted_ids(mut entries: Vec<(f64, String)>) -> Vec<String> {
 /// When `focused_id` is still present, returns its new index. Otherwise falls back to
 /// [`normalize_index`] on `fallback_index`.
 pub fn index_for_focused_id(
-    order: &[impl AsRef<str>],
-    focused_id: Option<&str>,
+    order: &[usize],
+    focused_id: Option<usize>,
     fallback_index: usize,
 ) -> usize {
     if let Some(id) = focused_id {
-        if let Some(pos) = order.iter().position(|entry| entry.as_ref() == id) {
+        if let Some(pos) = order.iter().position(|entry| *entry == id) {
             return pos;
         }
     }

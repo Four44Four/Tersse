@@ -4,7 +4,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 use tersse::runtime::{ButtonConfig, RuntimeUi, TextDisplayConfig, TextInputConfig};
-use tersse::{ElementPlacement, Location, ParentSide};
+use tersse::{ElementId, ElementPlacement, Location, ParentSide};
 
 use style::{button_style, locked_like_style, screen_title, text_input_style};
 
@@ -18,29 +18,36 @@ const CLEAR_LABEL: &str = "Clear Result";
 const DISPLAY_WIDTH: usize = 80;
 const RESULT_HEIGHT: usize = 12;
 
-const FOO_ID: &str = "foo_button";
-const FOO_TEXT_ID: &str = "foo_text_display";
-const BAR_ID: &str = "bar_button";
-const BAR_TEXT_ID: &str = "bar_text_display";
-const INPUT_ID: &str = "input";
-const PRESS_ID: &str = "press_button";
-const CLEAR_ID: &str = "clear_button";
-const RESULT_ID: &str = "result_display";
-
 #[derive(Clone, Copy)]
 struct FlashMessage {
     expires_at: Instant,
 }
 
 struct App {
+    foo_id: ElementId,
+    bar_id: ElementId,
+    input_id: ElementId,
+    press_id: ElementId,
+    clear_id: Option<ElementId>,
+    result_id: Option<ElementId>,
+    foo_text_id: Option<ElementId>,
+    bar_text_id: Option<ElementId>,
     foo_flash: Option<FlashMessage>,
     bar_flash: Option<FlashMessage>,
     result_visible: bool,
 }
 
 impl App {
-    fn new() -> Self {
+    fn new(foo_id: ElementId, bar_id: ElementId, input_id: ElementId, press_id: ElementId) -> Self {
         Self {
+            foo_id,
+            bar_id,
+            input_id,
+            press_id,
+            clear_id: None,
+            result_id: None,
+            foo_text_id: None,
+            bar_text_id: None,
             foo_flash: None,
             bar_flash: None,
             result_visible: false,
@@ -50,11 +57,15 @@ impl App {
     fn tick(&mut self, ui: &mut RuntimeUi) {
         if Self::message_expired(self.foo_flash) {
             self.foo_flash = None;
-            let _ = ui.remove_and_reflow(FOO_TEXT_ID);
+            if let Some(id) = self.foo_text_id.take() {
+                let _ = ui.remove_and_reflow(id);
+            }
         }
         if Self::message_expired(self.bar_flash) {
             self.bar_flash = None;
-            let _ = ui.remove_and_reflow(BAR_TEXT_ID);
+            if let Some(id) = self.bar_text_id.take() {
+                let _ = ui.remove_and_reflow(id);
+            }
         }
     }
 
@@ -62,50 +73,93 @@ impl App {
         self.foo_flash = Some(FlashMessage {
             expires_at: Instant::now() + FLASH_FOO,
         });
-        self.upsert_flash_display(ui, FOO_ID, FOO_TEXT_ID, 0.5, "Button 1");
+        self.foo_text_id = Some(self.upsert_flash_display(
+            ui,
+            self.foo_id,
+            self.foo_text_id,
+            0.5,
+            "Button 1",
+        ));
     }
 
     fn handle_bar(&mut self, ui: &mut RuntimeUi) {
         self.bar_flash = Some(FlashMessage {
             expires_at: Instant::now() + FLASH_BAR,
         });
-        self.upsert_flash_display(ui, BAR_ID, BAR_TEXT_ID, 1.5, "Button 2");
+        self.bar_text_id = Some(self.upsert_flash_display(
+            ui,
+            self.bar_id,
+            self.bar_text_id,
+            1.5,
+            "Button 2",
+        ));
     }
 
-    fn handle_press(&mut self, ui: &mut RuntimeUi, app_state: Rc<RefCell<App>>) {
-        let input = ui.read_text_input(INPUT_ID).unwrap_or_default();
+    fn handle_press(&mut self, ui: &mut RuntimeUi, app_state: Rc<RefCell<Option<App>>>) {
+        let input = ui.read_text_input(self.input_id).unwrap_or_default();
         let result = build_result_text(&input);
-        let _ = ui.set_text_input_lock_status(INPUT_ID, true);
+        let _ = ui.set_text_input_lock_status(self.input_id, true);
 
         let clear_x = label_width(PRESS_LABEL) + 1;
 
-        ui.upsert_button(ButtonConfig {
-            id: CLEAR_ID.to_string(),
-            label: CLEAR_LABEL.to_string(),
-            width: label_width(CLEAR_LABEL),
-            placement: ElementPlacement::relative_to(
-                INPUT_ID,
-                ParentSide::Bottom,
-                Location {
-                    x: clear_x as u16,
-                    y: 0,
+        self.clear_id = Some(if let Some(clear_id) = self.clear_id {
+            let _ = ui.update_button(
+                clear_id,
+                ButtonConfig {
+                    label: CLEAR_LABEL.to_string(),
+                    width: label_width(CLEAR_LABEL),
+                    placement: ElementPlacement::relative_to(
+                        self.input_id,
+                        ParentSide::Bottom,
+                        Location {
+                            x: clear_x as u16,
+                            y: 0,
+                        },
+                    ),
+                    focus_number: 4.0,
+                    style: button_style(),
+                    on_press: Box::new(move |ui| {
+                        app_state
+                            .borrow_mut()
+                            .as_mut()
+                            .unwrap()
+                            .handle_clear(ui);
+                    }),
                 },
-            ),
-            focus_number: 4.0,
-            style: button_style(),
-            on_press: Box::new(move |ui| {
-                let mut app = app_state.borrow_mut();
-                app.handle_clear(ui);
-            }),
+            );
+            clear_id
+        } else {
+            ui.create_button(ButtonConfig {
+                label: CLEAR_LABEL.to_string(),
+                width: label_width(CLEAR_LABEL),
+                placement: ElementPlacement::relative_to(
+                    self.input_id,
+                    ParentSide::Bottom,
+                    Location {
+                        x: clear_x as u16,
+                        y: 0,
+                    },
+                ),
+                focus_number: 4.0,
+                style: button_style(),
+                on_press: Box::new(move |ui| {
+                    app_state
+                        .borrow_mut()
+                        .as_mut()
+                        .unwrap()
+                        .handle_clear(ui);
+                }),
+            })
         });
 
         if self.result_visible {
-            let _ = ui.set_text_display_text(RESULT_ID, result);
+            if let Some(result_id) = self.result_id {
+                let _ = ui.set_text_display_text(result_id, result);
+            }
         } else {
-            ui.upsert_text_display(TextDisplayConfig {
-                id: RESULT_ID.to_string(),
+            self.result_id = Some(ui.create_text_display(TextDisplayConfig {
                 placement: ElementPlacement::relative_to(
-                    PRESS_ID,
+                    self.press_id,
                     ParentSide::Bottom,
                     Location::default(),
                 ),
@@ -114,36 +168,49 @@ impl App {
                 focus_number: 5.0,
                 style: locked_like_style(),
                 initial_text: result,
-            });
+            }));
             self.result_visible = true;
         }
     }
 
     fn handle_clear(&mut self, ui: &mut RuntimeUi) {
-        let _ = ui.remove_and_reflow(RESULT_ID);
-        let _ = ui.remove_element(CLEAR_ID);
-        let _ = ui.set_text_input_lock_status(INPUT_ID, false);
+        if let Some(result_id) = self.result_id.take() {
+            let _ = ui.remove_and_reflow(result_id);
+        }
+        if let Some(clear_id) = self.clear_id.take() {
+            let _ = ui.remove_element(clear_id);
+        }
+        let _ = ui.set_text_input_lock_status(self.input_id, false);
         self.result_visible = false;
     }
 
     fn upsert_flash_display(
         &self,
         ui: &mut RuntimeUi,
-        button_id: &str,
-        display_id: &str,
+        button_id: ElementId,
+        display_id: Option<ElementId>,
         focus_number: f64,
         text: &str,
-    ) {
+    ) -> ElementId {
         let width = text.chars().count().max(1);
-        ui.upsert_text_display(TextDisplayConfig {
-            id: display_id.to_string(),
-            placement: ElementPlacement::relative_to(button_id, ParentSide::Bottom, Location::default()),
+        let config = TextDisplayConfig {
+            placement: ElementPlacement::relative_to(
+                button_id,
+                ParentSide::Bottom,
+                Location::default(),
+            ),
             width,
             height: 1,
             focus_number,
             style: locked_like_style(),
             initial_text: text.to_string(),
-        });
+        };
+        if let Some(id) = display_id {
+            let _ = ui.update_text_display(id, config);
+            id
+        } else {
+            ui.create_text_display(config)
+        }
     }
 
     fn message_expired(message: Option<FlashMessage>) -> bool {
@@ -153,37 +220,35 @@ impl App {
 
 fn main() {
     let mut ui = RuntimeUi::new();
-    let app = Rc::new(RefCell::new(App::new()));
     ui.set_title(screen_title());
 
+    let app: Rc<RefCell<Option<App>>> = Rc::new(RefCell::new(None));
+
     let foo_app = Rc::clone(&app);
-    ui.upsert_button(ButtonConfig {
-        id: FOO_ID.to_string(),
+    let foo_id = ui.create_button(ButtonConfig {
         label: "Foo".to_string(),
         width: FOO_BAR_BUTTON_WIDTH,
         placement: ElementPlacement::absolute(Location { x: 0, y: 2 }),
         focus_number: 0.0,
         style: button_style(),
         on_press: Box::new(move |ui| {
-            let mut app = foo_app.borrow_mut();
-            app.handle_foo(ui);
+            foo_app.borrow_mut().as_mut().unwrap().handle_foo(ui);
         }),
     });
+
     let bar_app = Rc::clone(&app);
-    ui.upsert_button(ButtonConfig {
-        id: BAR_ID.to_string(),
+    let bar_id = ui.create_button(ButtonConfig {
         label: "Bar".to_string(),
         width: FOO_BAR_BUTTON_WIDTH,
         placement: ElementPlacement::absolute(Location { x: 0, y: 3 }),
         focus_number: 1.0,
         style: button_style(),
         on_press: Box::new(move |ui| {
-            let mut app = bar_app.borrow_mut();
-            app.handle_bar(ui);
+            bar_app.borrow_mut().as_mut().unwrap().handle_bar(ui);
         }),
     });
-    ui.upsert_text_input(TextInputConfig {
-        id: INPUT_ID.to_string(),
+
+    let input_id = ui.create_text_input(TextInputConfig {
         width: INPUT_WIDTH,
         placement: ElementPlacement::absolute(Location { x: 0, y: 4 }),
         focus_number: 2.0,
@@ -191,23 +256,31 @@ fn main() {
         locked: false,
         initial_text: String::new(),
     });
+
     let press_app = Rc::clone(&app);
-    ui.upsert_button(ButtonConfig {
-        id: PRESS_ID.to_string(),
+    let press_id = ui.create_button(ButtonConfig {
         label: PRESS_LABEL.to_string(),
         width: label_width(PRESS_LABEL),
-        placement: ElementPlacement::relative_to(INPUT_ID, ParentSide::Bottom, Location::default()),
+        placement: ElementPlacement::relative_to(input_id, ParentSide::Bottom, Location::default()),
         focus_number: 3.0,
         style: button_style(),
         on_press: Box::new(move |ui| {
-            let mut app = press_app.borrow_mut();
-            app.handle_press(ui, Rc::clone(&press_app));
+            press_app
+                .borrow_mut()
+                .as_mut()
+                .unwrap()
+                .handle_press(ui, Rc::clone(&press_app));
         }),
     });
+
+    *app.borrow_mut() = Some(App::new(foo_id, bar_id, input_id, press_id));
+
     loop {
         {
-            let mut app = app.borrow_mut();
-            app.tick(&mut ui);
+            let mut slot = app.borrow_mut();
+            if let Some(app) = slot.as_mut() {
+                app.tick(&mut ui);
+            }
         }
         if !ui.run_frame(Duration::from_millis(POLL_TIMEOUT_MS)) {
             break;

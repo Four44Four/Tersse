@@ -2,6 +2,7 @@ use crate::pure::element_placement::{
     descendant_ids, resolve_absolute_location, resolve_overlap_location, ElementBounds,
     ElementPlacement,
 };
+use crate::ElementId;
 use crate::Location;
 
 use super::layout::{
@@ -13,7 +14,7 @@ use super::RuntimeUi;
 impl RuntimeUi {
     pub(super) fn resolve_config_location(
         &mut self,
-        id: &str,
+        id: usize,
         placement: &ElementPlacement,
         width: usize,
         height: usize,
@@ -30,7 +31,7 @@ impl RuntimeUi {
             candidate,
             &others,
             id,
-            placement.parent_id.as_deref(),
+            placement.parent_id,
         );
         for (min_y, delta) in shifts {
             self.push_elements_down_from(min_y, delta, &[id]);
@@ -43,34 +44,30 @@ impl RuntimeUi {
         &mut self,
         min_y: u16,
         delta: i32,
-        exclude_ids: &[&str],
+        exclude_ids: &[usize],
     ) {
         if delta <= 0 {
             return;
         }
-        let ids: Vec<String> = self
-            .elements
-            .iter()
-            .map(|element| element.id().to_string())
-            .collect();
+        let ids: Vec<usize> = self.elements.iter().map(|element| element.id()).collect();
         for id in ids {
-            if exclude_ids.contains(&id.as_str()) {
+            if exclude_ids.contains(&id) {
                 continue;
             }
-            let Some(placement) = self.placement_for(&id) else {
+            let Some(placement) = self.placement_for(id) else {
                 continue;
             };
             if placement.has_parent() {
                 continue;
             }
-            let Some(location) = self.element_location(&id) else {
+            let Some(location) = self.element_location(ElementId::from_internal(id)) else {
                 continue;
             };
             if location.y < min_y {
                 continue;
             }
             let _ = self.set_element_location_by_id(
-                &id,
+                id,
                 Location {
                     x: location.x,
                     y: location.y.saturating_add(delta as u16),
@@ -85,34 +82,30 @@ impl RuntimeUi {
         &mut self,
         min_y: u16,
         rows: u16,
-        exclude_ids: &[&str],
+        exclude_ids: &[usize],
     ) {
         if rows == 0 {
             return;
         }
-        let ids: Vec<String> = self
-            .elements
-            .iter()
-            .map(|element| element.id().to_string())
-            .collect();
+        let ids: Vec<usize> = self.elements.iter().map(|element| element.id()).collect();
         for id in ids {
-            if exclude_ids.contains(&id.as_str()) {
+            if exclude_ids.contains(&id) {
                 continue;
             }
-            let Some(placement) = self.placement_for(&id) else {
+            let Some(placement) = self.placement_for(id) else {
                 continue;
             };
             if placement.has_parent() {
                 continue;
             }
-            let Some(location) = self.element_location(&id) else {
+            let Some(location) = self.element_location(ElementId::from_internal(id)) else {
                 continue;
             };
             if location.y < min_y {
                 continue;
             }
             let _ = self.set_element_location_by_id(
-                &id,
+                id,
                 Location {
                     x: location.x,
                     y: location.y.saturating_sub(rows),
@@ -124,23 +117,19 @@ impl RuntimeUi {
 
     /// Resets every element to its placement-derived location (used after removal).
     pub(super) fn relayout_all_from_placements(&mut self) {
-        let ids: Vec<String> = self
-            .elements
-            .iter()
-            .map(|element| element.id().to_string())
-            .collect();
+        let ids: Vec<usize> = self.elements.iter().map(|element| element.id()).collect();
         for id in &ids {
-            let Some(placement) = self.placement_for(id) else {
+            let Some(placement) = self.placement_for(*id) else {
                 continue;
             };
             if placement.has_parent() {
                 continue;
             }
-            let Some((width, height)) = self.element_dimensions(id) else {
+            let Some((width, height)) = self.element_dimensions(*id) else {
                 continue;
             };
             let location = self.resolve_placement_only(&placement, width, height);
-            let _ = self.set_element_location_by_id(id, location);
+            let _ = self.set_element_location_by_id(*id, location);
         }
         self.recompute_all_relative_locations();
     }
@@ -162,20 +151,20 @@ impl RuntimeUi {
                 .elements
                 .iter()
                 .filter_map(|element| {
-                    let id = element.id().to_string();
-                    let placement = self.placement_for(&id)?;
+                    let id = element.id();
+                    let placement = self.placement_for(id)?;
                     placement.has_parent().then_some(id)
                 })
                 .collect::<Vec<_>>();
             for id in ids {
-                let Some(placement) = self.placement_for(&id) else {
+                let Some(placement) = self.placement_for(id) else {
                     continue;
                 };
-                let Some((width, height)) = self.element_dimensions(&id) else {
+                let Some((width, height)) = self.element_dimensions(id) else {
                     continue;
                 };
                 let location = self.resolve_placement_only(&placement, width, height);
-                let _ = self.set_element_location_by_id(&id, location);
+                let _ = self.set_element_location_by_id(id, location);
             }
         }
     }
@@ -201,13 +190,12 @@ impl RuntimeUi {
     ) -> Location {
         let parent_bounds = placement
             .parent_id
-            .as_deref()
-            .and_then(|parent_id| self.element_bounds(parent_id));
+            .and_then(|parent_id| self.element_bounds(ElementId::from_internal(parent_id)));
         resolve_absolute_location(placement, parent_bounds, child_bounds)
             .unwrap_or(Location::default())
     }
 
-    pub(super) fn element_bounds(&self, id: &str) -> Option<ElementBounds> {
+    pub(super) fn element_bounds(&self, id: ElementId) -> Option<ElementBounds> {
         let element = self.element_by_id(id)?;
         Some(self.runtime_element_bounds(element))
     }
@@ -239,16 +227,16 @@ impl RuntimeUi {
         }
     }
 
-    pub(super) fn placement_for(&self, id: &str) -> Option<ElementPlacement> {
-        match self.element_by_id(id)? {
+    pub(super) fn placement_for(&self, id: usize) -> Option<ElementPlacement> {
+        match self.element_by_id(ElementId::from_internal(id))? {
             RuntimeElement::Button(button) => Some(button.placement.clone()),
             RuntimeElement::TextInput(input) => Some(input.placement.clone()),
             RuntimeElement::TextDisplay(display) => Some(display.placement.clone()),
         }
     }
 
-    pub(super) fn set_element_location_by_id(&mut self, id: &str, location: Location) -> bool {
-        let Some(element) = self.element_mut_by_id(id) else {
+    pub(super) fn set_element_location_by_id(&mut self, id: usize, location: Location) -> bool {
+        let Some(element) = self.element_mut_by_id(ElementId::from_internal(id)) else {
             return false;
         };
         match element {
@@ -259,33 +247,34 @@ impl RuntimeUi {
         true
     }
 
-    pub(super) fn shift_element_subtree(&mut self, root_id: &str, delta_x: i16, delta_y: i32) {
+    pub(super) fn shift_element_subtree(&mut self, root_id: ElementId, delta_x: i16, delta_y: i32) {
         if delta_x == 0 && delta_y == 0 {
             return;
         }
-        let mut ids = vec![root_id.to_string()];
+        let root = root_id.as_internal();
+        let mut ids = vec![root];
         let placements = self.all_placements();
-        ids.extend(descendant_ids(root_id, &placements));
+        ids.extend(descendant_ids(root, &placements));
         for id in ids {
-            let Some(location) = self.element_location(&id) else {
+            let Some(location) = self.element_location(ElementId::from_internal(id)) else {
                 continue;
             };
             let shifted = Location {
                 x: (location.x as i32 + delta_x as i32).max(0) as u16,
                 y: (location.y as i32 + delta_y).max(0) as u16,
             };
-            let _ = self.set_element_location_by_id(&id, shifted);
+            let _ = self.set_element_location_by_id(id, shifted);
         }
     }
 
-    pub(super) fn remove_element_cascade(&mut self, id: &str) -> bool {
+    pub(super) fn remove_element_cascade(&mut self, id: ElementId) -> bool {
         let placements = self.all_placements();
-        let mut to_remove = descendant_ids(id, &placements);
-        to_remove.push(id.to_string());
-        to_remove.sort_by(|a, b| b.len().cmp(&a.len()));
+        let root = id.as_internal();
+        let mut to_remove = descendant_ids(root, &placements);
+        to_remove.push(root);
         let mut removed = false;
         for remove_id in to_remove {
-            if self.remove_element(&remove_id) {
+            if self.remove_element(ElementId::from_internal(remove_id)) {
                 removed = true;
             }
         }
@@ -294,12 +283,12 @@ impl RuntimeUi {
 
     fn collect_overlap_candidates(
         &self,
-        skip_id: &str,
-    ) -> Vec<(String, ElementBounds, Option<String>)> {
+        skip_id: usize,
+    ) -> Vec<(usize, ElementBounds, Option<usize>)> {
         self.elements
             .iter()
             .filter_map(|element| {
-                let id = element.id().to_string();
+                let id = element.id();
                 if id == skip_id {
                     return None;
                 }
@@ -317,7 +306,7 @@ impl RuntimeUi {
             .collect()
     }
 
-    fn all_placements(&self) -> Vec<(String, ElementPlacement)> {
+    fn all_placements(&self) -> Vec<(usize, ElementPlacement)> {
         self.elements
             .iter()
             .map(|element| {
@@ -326,17 +315,18 @@ impl RuntimeUi {
                     RuntimeElement::TextInput(input) => input.placement.clone(),
                     RuntimeElement::TextDisplay(display) => display.placement.clone(),
                 };
-                (element.id().to_string(), placement)
+                (element.id(), placement)
             })
             .collect()
     }
 
-    fn element_dimensions(&mut self, id: &str) -> Option<(usize, usize)> {
-        match self.element_by_id(id)? {
+    fn element_dimensions(&mut self, id: usize) -> Option<(usize, usize)> {
+        let element_id = ElementId::from_internal(id);
+        match self.element_by_id(element_id)? {
             RuntimeElement::Button(button) => Some((button.button.width, render_height_for_button())),
             RuntimeElement::TextInput(input) => {
                 let width = input.field.width.max(1);
-                let height = self.text_input_render_height(id)?;
+                let height = self.text_input_render_height(element_id)?;
                 Some((width, height))
             }
             RuntimeElement::TextDisplay(display) => Some((

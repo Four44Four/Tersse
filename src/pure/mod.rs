@@ -1,6 +1,7 @@
 //! Side-effect-free helpers (no I/O, no UI).
 
 pub mod button;
+pub mod element_id;
 pub mod element_placement;
 pub mod focus_key;
 pub mod focus_order;

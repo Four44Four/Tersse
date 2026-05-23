@@ -6,3 +6,36 @@
  - Do not render TUI elements beyond terminal bounds
  - Cut off parts of multi-line TUI elements that exceed terminal height
  - Cut off parts of TUI elements that exceed terminal width
+ - Can be created with a parent element:
+    - Will be positioned relative to parent element's Left, Right, Top, or Bottom sides
+    - Default positions relative to parent element (location is {0, 0}):
+       - Left -> child element's top left corner will start at the same Y position as the parent element, but X position will be the parent element's top left corner minus the width of the child element
+       - Right -> child element's top left corner will start at the same Y position as the parent element, but X position will be the parent element's top left corner plus the width of the parent element
+       - Top -> child element's top left corner will start at the parent element's Y position minus the child element's height, but the X position will be the same as the parent element's top left corner
+       - Bottom -> child element's top left corner will start at the parent element's Y position plus the parent element's height, but the X position will be the same as the parent element's top left corner
+    - `location` parameter will offset the child element further based on the above default locations
+    - If parent element is removed:
+       - Child elements are removed too
+    - If parent element is moved:
+       - Child elements will be moved by the same amount
+ - If no parent element is supplied:
+    - Will be positioned relative to the top left corner of the terminal
+    - Default position will be at the top left corner (location {0, 0})
+    - `location` parameter will offset element from the top left corner
+ - Elements cannot overlap:
+    - If an element is made with a location that causes it to overlap with another non-parent element, push either the lower element down and push all elements lower than it down enough so that there are no overlapping elements
+ - Elements are to be stored in a Hashmap with ID as the key and the element as the value
+    - Elements must be insertable, accessible, and deletable in O(1) time complexity
+ - A secondary focus order sorted tree is to be maintained pairing focus_number float to element ID, sorted by focus_number float
+    - Insertion, deletion, and arbitrary access from focus_number must be in O(log(n)) time complexity
+    - Shifting focus between adjacent elements will traverse in-order in this tree to the next/previous pair
+ - Newly created elements will generate a usize ID from an auto-incrementing global ID counter that can be used to uniquely identify them
+    - If this overflows, it goes back down to 0 and repeats
+    - Whenever an ID is generated:
+        - If that ID already has an element associated with it
+           - Try the next ID
+           - Keep incrementing until an ID that doesn't have an associated element is foreground
+        - Else:
+           - Create the element and insert it into the element storage data structure normally
+ - All ID related logic should be private to internal API only
+    - Library API user should never manually supply or mutate an element's ID

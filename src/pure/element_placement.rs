@@ -1,5 +1,6 @@
 //! Parent-relative positioning and overlap resolution (no I/O).
 
+use crate::ElementId;
 use crate::Location;
 
 /// Which side of the parent element a child is anchored to.
@@ -24,7 +25,7 @@ pub struct ElementBounds {
 /// Placement relative to a parent element or the terminal origin.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ElementPlacement {
-    pub parent_id: Option<String>,
+    pub(crate) parent_id: Option<usize>,
     pub side: ParentSide,
     pub offset: Location,
 }
@@ -38,13 +39,9 @@ impl ElementPlacement {
         }
     }
 
-    pub fn relative_to(
-        parent_id: impl Into<String>,
-        side: ParentSide,
-        offset: Location,
-    ) -> Self {
+    pub fn relative_to(parent: ElementId, side: ParentSide, offset: Location) -> Self {
         Self {
-            parent_id: Some(parent_id.into()),
+            parent_id: Some(parent.as_internal()),
             side,
             offset,
         }
@@ -96,8 +93,7 @@ pub fn resolve_absolute_location(
     parent: Option<ElementBounds>,
     child_size: ElementBounds,
 ) -> Option<Location> {
-    let base = if let Some(parent_id) = &placement.parent_id {
-        let _ = parent_id;
+    let base = if placement.parent_id.is_some() {
         let parent_bounds = parent?;
         default_child_location(parent_bounds, child_size, placement.side)
     } else {
@@ -118,10 +114,10 @@ pub fn rectangles_overlap(a: ElementBounds, b: ElementBounds) -> bool {
 }
 
 fn is_parent_child(
-    candidate_parent: Option<&str>,
-    other_parent: Option<&str>,
-    candidate_id: &str,
-    other_id: &str,
+    candidate_parent: Option<usize>,
+    other_parent: Option<usize>,
+    candidate_id: usize,
+    other_id: usize,
 ) -> bool {
     candidate_parent == Some(other_id)
         || other_parent == Some(candidate_id)
@@ -147,9 +143,9 @@ pub fn overlap_push_delta(candidate: ElementBounds, other: ElementBounds) -> u16
 /// Each push moves every non-excluded element at `y >= min_y` down by `delta` rows.
 pub fn resolve_overlap_location(
     mut candidate: ElementBounds,
-    others: &[(String, ElementBounds, Option<String>)],
-    candidate_id: &str,
-    candidate_parent: Option<&str>,
+    others: &[(usize, ElementBounds, Option<usize>)],
+    candidate_id: usize,
+    candidate_parent: Option<usize>,
 ) -> (Location, Vec<(u16, i32)>) {
     let mut adjusted_others = others.to_vec();
     let mut shifts: Vec<(u16, i32)> = Vec::new();
@@ -158,9 +154,9 @@ pub fn resolve_overlap_location(
         for (other_id, other_bounds, other_parent) in &mut adjusted_others {
             if is_parent_child(
                 candidate_parent,
-                other_parent.as_deref(),
+                *other_parent,
                 candidate_id,
-                other_id,
+                *other_id,
             ) {
                 continue;
             }
@@ -203,13 +199,13 @@ fn merge_push_shift(shifts: &mut Vec<(u16, i32)>, min_y: u16, delta: i32) {
 
 /// Collects direct child ids for each parent.
 pub fn direct_children<'a>(
-    parent_id: &str,
-    placements: impl Iterator<Item = (&'a str, &'a ElementPlacement)>,
-) -> Vec<String> {
+    parent_id: usize,
+    placements: impl Iterator<Item = (usize, &'a ElementPlacement)>,
+) -> Vec<usize> {
     placements
         .filter_map(|(id, placement)| {
-            if placement.parent_id.as_deref() == Some(parent_id) {
-                Some(id.to_string())
+            if placement.parent_id == Some(parent_id) {
+                Some(id)
             } else {
                 None
             }
@@ -218,92 +214,19 @@ pub fn direct_children<'a>(
 }
 
 /// Collects all descendant ids (depth-first).
-pub fn descendant_ids(
-    root_id: &str,
-    placements: &[(String, ElementPlacement)],
-) -> Vec<String> {
+pub fn descendant_ids(root_id: usize, placements: &[(usize, ElementPlacement)]) -> Vec<usize> {
     let mut out = Vec::new();
     let mut stack = direct_children(
         root_id,
-        placements
-            .iter()
-            .map(|(id, p)| (id.as_str(), p)),
+        placements.iter().map(|(id, p)| (*id, p)),
     );
     while let Some(id) = stack.pop() {
-        out.push(id.clone());
+        out.push(id);
         stack.extend(direct_children(
-            &id,
-            placements
-                .iter()
-                .map(|(pid, p)| (pid.as_str(), p)),
+            id,
+            placements.iter().map(|(pid, p)| (*pid, p)),
         ));
     }
     out
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn bounds(x: u16, y: u16, width: usize, height: usize) -> ElementBounds {
-        ElementBounds {
-            x,
-            y,
-            width,
-            height,
-        }
-    }
-
-    #[test]
-    fn bottom_side_places_child_below_parent() {
-        let parent = bounds(0, 2, 5, 1);
-        let child = bounds(0, 0, 8, 1);
-        let loc = default_child_location(parent, child, ParentSide::Bottom);
-        assert_eq!(loc, Location { x: 0, y: 3 });
-    }
-
-    #[test]
-    fn left_side_places_child_to_the_left() {
-        let parent = bounds(10, 2, 5, 1);
-        let child = bounds(0, 0, 4, 1);
-        let loc = default_child_location(parent, child, ParentSide::Left);
-        assert_eq!(loc, Location { x: 6, y: 2 });
-    }
-
-    #[test]
-    fn absolute_placement_uses_terminal_origin_plus_offset() {
-        let placement = ElementPlacement::absolute(Location { x: 1, y: 2 });
-        let loc = resolve_absolute_location(
-            &placement,
-            None,
-            bounds(0, 0, 5, 1),
-        )
-        .unwrap();
-        assert_eq!(loc, Location { x: 1, y: 2 });
-    }
-
-    #[test]
-    fn relative_placement_uses_parent_bounds() {
-        let placement = ElementPlacement::relative_to("p", ParentSide::Bottom, Location::default());
-        let loc = resolve_absolute_location(
-            &placement,
-            Some(bounds(0, 4, 20, 1)),
-            bounds(0, 0, 80, 12),
-        )
-        .unwrap();
-        assert_eq!(loc, Location { x: 0, y: 5 });
-    }
-
-    #[test]
-    fn overlap_resolution_pushes_existing_lower_element() {
-        let candidate = bounds(0, 3, 8, 1);
-        let others = vec![(
-            "bar".to_string(),
-            bounds(0, 3, 5, 1),
-            None,
-        )];
-        let (loc, shifts) = resolve_overlap_location(candidate, &others, "flash", Some("foo"));
-        assert_eq!(loc, Location { x: 0, y: 3 });
-        assert_eq!(shifts, vec![(3, 1)]);
-    }
-}

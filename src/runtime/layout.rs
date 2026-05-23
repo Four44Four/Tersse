@@ -1,5 +1,6 @@
 use crate::pure::layout_reflow;
 use crate::pure::text_wrap;
+use crate::ElementId;
 
 use super::types::RuntimeElement;
 use super::{RuntimeUi, TextInputLayoutCache};
@@ -22,23 +23,26 @@ impl RuntimeUi {
             .elements
             .iter()
             .filter_map(|element| match element {
-                RuntimeElement::TextInput(input) => Some(input.id.clone()),
+                RuntimeElement::TextInput(input) => Some(input.id),
                 _ => None,
             })
             .collect::<Vec<_>>();
 
         let mut relayout = false;
         for id in text_input_ids {
+            let element_id = ElementId::from_internal(id);
             let old_height = self.cached_heights.get(&id).copied().unwrap_or(1);
-            let new_height = self.text_input_render_height(&id).unwrap_or(old_height);
+            let new_height = self
+                .text_input_render_height(element_id)
+                .unwrap_or(old_height);
             let delta = layout_reflow::height_delta(old_height, new_height);
             if delta == 0 {
                 continue;
             }
             if delta > 0 {
-                if let Some(location) = self.element_location(&id) {
+                if let Some(location) = self.element_location(element_id) {
                     let min_y = layout_reflow::min_y_after_change(location.y, old_height);
-                    self.push_elements_down_from(min_y, delta, &[id.as_str()]);
+                    self.push_elements_down_from(min_y, delta, &[id]);
                 }
             } else {
                 relayout = true;
@@ -64,20 +68,20 @@ impl RuntimeUi {
         }
     }
 
-    pub(super) fn text_input_render_height(&mut self, id: &str) -> Option<usize> {
+    pub(super) fn text_input_render_height(&mut self, id: ElementId) -> Option<usize> {
         let RuntimeElement::TextInput(input) = self.element_by_id(id)? else {
             return None;
         };
         let width = input.field.width.max(1);
         let text_len = input.field.text.len();
-        if let Some(cache) = self.text_input_layout_cache.get(id) {
+        if let Some(cache) = self.text_input_layout_cache.get(&id.as_internal()) {
             if cache.text_len == text_len && cache.width == width {
                 return Some(cache.height);
             }
         }
         let height = render_height_for_text_input_text(&input.field.text, width);
         self.text_input_layout_cache.insert(
-            id.to_string(),
+            id.as_internal(),
             TextInputLayoutCache {
                 text_len,
                 width,
@@ -87,22 +91,19 @@ impl RuntimeUi {
         Some(height)
     }
 
-    pub(super) fn invalidate_text_input_layout_cache(&mut self, id: &str) {
-        self.text_input_layout_cache.remove(id);
+    pub(super) fn invalidate_text_input_layout_cache(&mut self, id: ElementId) {
+        self.text_input_layout_cache.remove(&id.as_internal());
     }
 
     pub(super) fn refresh_height_cache(&mut self) {
         self.cached_heights.clear();
-        let ids: Vec<String> = self
-            .elements
-            .iter()
-            .map(|e| e.id().to_string())
-            .collect();
+        let ids: Vec<usize> = self.elements.iter().map(|e| e.id()).collect();
         for id in ids {
-            let height = match self.element_by_id(&id) {
-                Some(RuntimeElement::TextInput(_)) => {
-                    self.text_input_render_height(&id).unwrap_or(1)
-                }
+            let element_id = ElementId::from_internal(id);
+            let height = match self.element_by_id(element_id) {
+                Some(RuntimeElement::TextInput(_)) => self
+                    .text_input_render_height(element_id)
+                    .unwrap_or(1),
                 Some(other) => self.element_render_height(other),
                 None => 1,
             };

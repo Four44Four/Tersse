@@ -4,7 +4,7 @@ use std::cmp::Ordering;
 #[derive(Clone, Debug)]
 pub struct FocusKey {
     pub focus_number: f64,
-    pub id: String,
+    pub id: usize,
 }
 
 impl PartialEq for FocusKey {
@@ -16,11 +16,8 @@ impl PartialEq for FocusKey {
 impl Eq for FocusKey {}
 
 impl FocusKey {
-    pub fn new(focus_number: f64, id: impl Into<String>) -> Self {
-        Self {
-            focus_number,
-            id: id.into(),
-        }
+    pub fn new(focus_number: f64, id: usize) -> Self {
+        Self { focus_number, id }
     }
 }
 

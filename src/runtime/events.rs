@@ -13,13 +13,13 @@ impl RuntimeUi {
         let Some(id) = self.current_focused_id() else {
             return false;
         };
-        let Some(RuntimeElement::TextDisplay(_)) = self.element_by_id(&id) else {
+        let Some(RuntimeElement::TextDisplay(_)) = self.element_by_id(id) else {
             return false;
         };
 
         match key {
             TerminalKey::AltUp => {
-                let Some(RuntimeElement::TextDisplay(display)) = self.element_mut_by_id(&id) else {
+                let Some(RuntimeElement::TextDisplay(display)) = self.element_mut_by_id(id) else {
                     return false;
                 };
                 if display.scroll == 0 {
@@ -30,7 +30,7 @@ impl RuntimeUi {
             }
             TerminalKey::AltDown => {
                 let (total, scroll, viewport_rows) = {
-                    let Some(RuntimeElement::TextDisplay(display)) = self.element_by_id(&id) else {
+                    let Some(RuntimeElement::TextDisplay(display)) = self.element_by_id(id) else {
                         return false;
                     };
                     let width = display.width.max(1);
@@ -47,7 +47,7 @@ impl RuntimeUi {
                     );
                     (total, scroll, viewport_h.max(1) as usize)
                 };
-                let Some(RuntimeElement::TextDisplay(display)) = self.element_mut_by_id(&id) else {
+                let Some(RuntimeElement::TextDisplay(display)) = self.element_mut_by_id(id) else {
                     return false;
                 };
                 display.scroll = scroll_view::scroll_line_down(scroll, total, viewport_rows);
@@ -61,15 +61,15 @@ impl RuntimeUi {
         let Some(id) = self.current_focused_id() else {
             return false;
         };
-        let Some(RuntimeElement::TextInput(input)) = self.element_by_id(&id) else {
+        let Some(RuntimeElement::TextInput(input)) = self.element_by_id(id) else {
             return false;
         };
         if input.field.locked {
             return false;
         }
-        let state = self.text_input_state(&id);
+        let state = self.text_input_state(id);
         if let Some(pasted) = text_input::paste_text(&state, paste) {
-            self.apply_text_input_paste(&id, pasted);
+            self.apply_text_input_paste(id, pasted);
         }
         true
     }
@@ -78,7 +78,7 @@ impl RuntimeUi {
         let Some(id) = self.current_focused_id() else {
             return false;
         };
-        let Some(RuntimeElement::TextInput(input)) = self.element_by_id(&id) else {
+        let Some(RuntimeElement::TextInput(input)) = self.element_by_id(id) else {
             return false;
         };
 
@@ -96,7 +96,7 @@ impl RuntimeUi {
             return false;
         }
 
-        let state = self.text_input_state(&id);
+        let state = self.text_input_state(id);
         let next_state = match key {
             TerminalKey::Left { extend_selection } => {
                 text_input::cursor_left(&state, extend_selection)
@@ -112,7 +112,7 @@ impl RuntimeUi {
             TerminalKey::Copy => {
                 if let Some((updated, copied)) = text_input::copy_selection(&state) {
                     if clipboard::set_text(&copied) {
-                        self.set_text_input_state(&id, updated);
+                        self.set_text_input_state(id, updated);
                     }
                 }
                 return true;
@@ -120,7 +120,7 @@ impl RuntimeUi {
             TerminalKey::Cut => {
                 if let Some((updated, cut)) = text_input::cut_selection(&state) {
                     if clipboard::set_text(&cut) {
-                        self.set_text_input_state(&id, updated);
+                        self.set_text_input_state(id, updated);
                     }
                 }
                 return true;
@@ -137,7 +137,7 @@ impl RuntimeUi {
             _ => return false,
         };
 
-        self.apply_text_input_state(&id, next_state);
+        self.apply_text_input_state(id, next_state);
         true
     }
 
@@ -146,7 +146,7 @@ impl RuntimeUi {
             return UiEvent::None;
         };
         let mut callback = {
-            let Some(RuntimeElement::Button(button)) = self.element_mut_by_id(&id) else {
+            let Some(RuntimeElement::Button(button)) = self.element_mut_by_id(id) else {
                 return UiEvent::None;
             };
             button.on_press.take()
@@ -155,7 +155,7 @@ impl RuntimeUi {
             handler(self);
         }
         if let Some(handler) = callback {
-            if let Some(RuntimeElement::Button(button)) = self.element_mut_by_id(&id) {
+            if let Some(RuntimeElement::Button(button)) = self.element_mut_by_id(id) {
                 if button.on_press.is_none() {
                     button.on_press = Some(handler);
                 }
