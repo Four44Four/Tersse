@@ -9,8 +9,5 @@ pub fn set_text(text: &str) -> bool {
 }
 
 pub fn get_text() -> Option<String> {
-    Clipboard::new()
-        .ok()?
-        .get_text()
-        .ok()
+    Clipboard::new().ok()?.get_text().ok()
 }

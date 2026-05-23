@@ -227,7 +227,10 @@ pub fn paste_text(state: &TextInputState, paste: &str) -> Option<TextInputState>
     };
     let mut text = base.text;
     let mut cursor = base.cursor;
-    for c in paste.chars().filter(|c| !c.is_control() || *c == '\t' || *c == '\n') {
+    for c in paste
+        .chars()
+        .filter(|c| !c.is_control() || *c == '\t' || *c == '\n')
+    {
         insert_char_at(&mut text, cursor, c);
         cursor += 1;
     }

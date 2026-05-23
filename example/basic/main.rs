@@ -82,7 +82,9 @@ impl App {
         let press_loc = ui
             .element_location(PRESS_ID)
             .unwrap_or(Location { x: 0, y: 5 });
-        let press_width = ui.button_width(PRESS_ID).unwrap_or(label_width(PRESS_LABEL));
+        let press_width = ui
+            .button_width(PRESS_ID)
+            .unwrap_or(label_width(PRESS_LABEL));
         let clear_x = press_loc.x as usize + press_width + 1;
 
         ui.upsert_button(ButtonConfig {

@@ -1,9 +1,9 @@
 //! Public API for building and styling TUI elements.
 
-pub mod pure;
 pub mod clipboard;
-pub mod terminal_input;
+pub mod pure;
 pub mod runtime;
+pub mod terminal_input;
 
 use std::error::Error;
 use std::fmt::{Display, Formatter};

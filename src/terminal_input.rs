@@ -1,8 +1,8 @@
 //! Crossterm raw-mode keyboard input (cross-platform, including Shift+arrow modifiers).
 
+use crate::pure::keyboard::arrow_extend_selection;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
-use crate::pure::keyboard::arrow_extend_selection;
 use std::io;
 use std::time::Duration;
 
@@ -77,9 +77,15 @@ fn map_key_event(key: KeyEvent) -> Option<TerminalKey> {
         }),
         KeyCode::Up if key.modifiers.contains(KeyModifiers::ALT) => Some(TerminalKey::AltUp),
         KeyCode::Down if key.modifiers.contains(KeyModifiers::ALT) => Some(TerminalKey::AltDown),
-        KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => Some(TerminalKey::Copy),
-        KeyCode::Char('x') if key.modifiers.contains(KeyModifiers::CONTROL) => Some(TerminalKey::Cut),
-        KeyCode::Char('v') if key.modifiers.contains(KeyModifiers::CONTROL) => Some(TerminalKey::Paste),
+        KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+            Some(TerminalKey::Copy)
+        }
+        KeyCode::Char('x') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+            Some(TerminalKey::Cut)
+        }
+        KeyCode::Char('v') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+            Some(TerminalKey::Paste)
+        }
         KeyCode::Up => Some(TerminalKey::Up),
         KeyCode::Down => Some(TerminalKey::Down),
         KeyCode::Char('q' | 'Q') => Some(TerminalKey::Quit),
