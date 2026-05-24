@@ -32,21 +32,23 @@ pub fn normalize_index(current: usize, len: usize) -> usize {
     }
 }
 
-/// Moves focus forward with wraparound.
+/// Moves focus forward, staying on the last element when already there.
 pub fn next_index(current: usize, len: usize) -> usize {
     if len == 0 {
         0
+    } else if current >= len - 1 {
+        len - 1
     } else {
-        (current + 1) % len
+        current + 1
     }
 }
 
-/// Moves focus backward with wraparound.
+/// Moves focus backward, staying on the first element when already there.
 pub fn prev_index(current: usize, len: usize) -> usize {
     if len == 0 {
         0
     } else if current == 0 {
-        len - 1
+        0
     } else {
         current - 1
     }

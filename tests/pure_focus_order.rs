@@ -21,10 +21,16 @@ fn normalize_index_handles_empty_and_out_of_bounds() {
 }
 
 #[test]
-fn next_index_wraps_like_right_or_down_navigation() {
+fn next_index_advances_until_last_element() {
     assert_eq!(next_index(0, 0), 0);
     assert_eq!(next_index(0, 3), 1);
-    assert_eq!(next_index(2, 3), 0);
+    assert_eq!(next_index(1, 3), 2);
+}
+
+#[test]
+fn next_index_stays_on_last_element() {
+    assert_eq!(next_index(2, 3), 2);
+    assert_eq!(next_index(5, 3), 2);
 }
 
 #[test]
@@ -48,8 +54,13 @@ fn index_for_focused_id_falls_back_when_focused_id_is_gone() {
 }
 
 #[test]
-fn prev_index_wraps_like_left_or_up_navigation() {
+fn prev_index_retreats_until_first_element() {
     assert_eq!(prev_index(0, 0), 0);
     assert_eq!(prev_index(2, 3), 1);
-    assert_eq!(prev_index(0, 3), 2);
+    assert_eq!(prev_index(1, 3), 0);
+}
+
+#[test]
+fn prev_index_stays_on_first_element() {
+    assert_eq!(prev_index(0, 3), 0);
 }
