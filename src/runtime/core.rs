@@ -1,7 +1,10 @@
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::thread::{self, JoinHandle};
+use std::time::Instant;
 
 use pancurses::{curs_set, endwin, initscr, noecho};
+use tokio::runtime::Handle;
+use tokio::sync::oneshot;
 
 use crate::terminal_input;
 use crate::terminal_input::{TerminalKey, TerminalPoll};
@@ -11,6 +14,87 @@ use super::element_store::ElementStore;
 use super::types::UiEvent;
 use super::ui_session::{self, UiSession};
 use super::RuntimeUi;
+
+/// Owns a current-thread Tokio runtime on a dedicated background thread.
+///
+/// The UI main thread blocks on `mpsc` and never drives the runtime directly, so
+/// keyboard listening and user-spawned async work run on this thread via `block_on`.
+pub(super) struct AsyncRuntimeDriver {
+    handle: Handle,
+    shutdown_tx: Option<oneshot::Sender<()>>,
+    thread: Option<JoinHandle<()>>,
+}
+
+impl AsyncRuntimeDriver {
+    pub fn start(signal_tx: ui_session::UiSignalSender) -> Self {
+        let (ready_tx, ready_rx) = std::sync::mpsc::sync_channel(1);
+        let (shutdown_tx, shutdown_rx) = oneshot::channel();
+
+        let thread = thread::Builder::new()
+            .name("tersse-async".into())
+            .spawn(move || {
+                let runtime = tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build()
+                    .expect("Failed to create async runtime");
+                ready_tx
+                    .send(runtime.handle().clone())
+                    .expect("async runtime ready signal");
+                runtime.block_on(run_async_driver(signal_tx, shutdown_rx));
+            })
+            .expect("Failed to spawn async driver thread");
+
+        let handle = ready_rx
+            .recv()
+            .expect("async runtime ready signal missing");
+        Self {
+            handle,
+            shutdown_tx: Some(shutdown_tx),
+            thread: Some(thread),
+        }
+    }
+
+    pub fn handle(&self) -> Handle {
+        self.handle.clone()
+    }
+}
+
+impl Drop for AsyncRuntimeDriver {
+    fn drop(&mut self) {
+        if let Some(tx) = self.shutdown_tx.take() {
+            let _ = tx.send(());
+        }
+        if let Some(thread) = self.thread.take() {
+            let _ = thread.join();
+        }
+    }
+}
+
+async fn run_async_driver(
+    signal_tx: ui_session::UiSignalSender,
+    mut shutdown: oneshot::Receiver<()>,
+) {
+    let mut stream = terminal_input::terminal_event_stream();
+    loop {
+        tokio::select! {
+            _ = &mut shutdown => break,
+            event = terminal_input::read_terminal_event(&mut stream) => {
+                match event {
+                    Ok(Some(event)) => {
+                        if signal_tx.send(ui_session::UiSignal::Terminal(event)).is_err() {
+                            break;
+                        }
+                    }
+                    Ok(None) => break,
+                    Err(_) => {
+                        let _ = signal_tx.send(ui_session::UiSignal::TerminalError);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+}
 
 impl RuntimeUi {
     pub fn new() -> Self {
@@ -23,9 +107,7 @@ impl RuntimeUi {
 
         let ui_queue = ui_session::new_ui_queue();
         let (ui_signal_tx, ui_signal_rx) = ui_session::new_ui_signal_channel();
-        let async_runtime =
-            tokio::runtime::Runtime::new().expect("Failed to create async runtime");
-        let keyboard_task = Some(spawn_keyboard_task(&async_runtime, ui_signal_tx.clone()));
+        let async_driver = AsyncRuntimeDriver::start(ui_signal_tx.clone());
 
         let mut ui = Self {
             win,
@@ -44,8 +126,7 @@ impl RuntimeUi {
             ui_queue,
             ui_signal_tx,
             ui_signal_rx,
-            async_runtime: Some(async_runtime),
-            keyboard_task,
+            async_driver: Some(async_driver),
             has_rendered_first_frame: false,
             ui_queue_redraw_pending: false,
             ui_queue_redraw_plan: crate::pure::ui_redraw::ElementRedrawPlan::default(),
@@ -74,11 +155,10 @@ impl RuntimeUi {
     /// Use this to spawn async background tasks without creating a separate runtime.
     pub fn runtime(&self) -> super::UiRuntime {
         let handle = self
-            .async_runtime
+            .async_driver
             .as_ref()
             .expect("async runtime missing")
-            .handle()
-            .clone();
+            .handle();
         super::UiRuntime::new(handle)
     }
 
@@ -203,37 +283,9 @@ impl RuntimeUi {
 
 impl Drop for RuntimeUi {
     fn drop(&mut self) {
-        if let Some(task) = self.keyboard_task.take() {
-            task.abort();
-        }
-        if let Some(runtime) = self.async_runtime.take() {
-            runtime.shutdown_timeout(Duration::from_millis(50));
-        }
+        let _ = self.async_driver.take();
         let _ = curs_set(1);
         endwin();
         let _ = terminal_input::leave_raw_mode();
     }
-}
-
-fn spawn_keyboard_task(
-    runtime: &tokio::runtime::Runtime,
-    signal_tx: ui_session::UiSignalSender,
-) -> tokio::task::JoinHandle<()> {
-    runtime.spawn(async move {
-        let mut stream = terminal_input::terminal_event_stream();
-        loop {
-            match terminal_input::read_terminal_event(&mut stream).await {
-                Ok(Some(event)) => {
-                    if signal_tx.send(ui_session::UiSignal::Terminal(event)).is_err() {
-                        break;
-                    }
-                }
-                Ok(None) => break,
-                Err(_) => {
-                    let _ = signal_tx.send(ui_session::UiSignal::TerminalError);
-                    break;
-                }
-            }
-        }
-    })
 }
