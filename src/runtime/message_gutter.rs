@@ -21,6 +21,59 @@ impl RuntimeUi {
         self.message_gutter_expires_at
     }
 
+    pub(super) fn message_gutter_screen_row_range(&self) -> Range<i32> {
+        if !self.message_gutter.visible || self.message_gutter.rendered_height == 0 {
+            return 0..0;
+        }
+        let (max_y, _) = self.win.get_max_yx();
+        gutter_screen_rows(
+            MSG_GUTTER_SIDE,
+            self.message_gutter.rendered_height,
+            max_y,
+        )
+    }
+
+    pub(super) fn is_message_gutter_screen_row(&self, screen_y: i32) -> bool {
+        self.message_gutter_screen_row_range()
+            .contains(&screen_y)
+    }
+
+    pub(super) fn cols_for_printing_respecting_message_gutter(
+        &self,
+        x: i32,
+        max_x: i32,
+        screen_y: i32,
+        terminal_max_y: i32,
+    ) -> i32 {
+        let cols = terminal_bounds::cols_for_printing(x, max_x, screen_y, terminal_max_y);
+        let gutter = self.message_gutter_screen_row_range();
+        message_gutter::clip_cols_to_avoid_wrapping_into_row(
+            cols,
+            x,
+            max_x,
+            message_gutter::row_printing_wraps_into_gutter_block(gutter, screen_y),
+        )
+    }
+
+    pub(super) fn max_element_row_cols_respecting_message_gutter(
+        &self,
+        x: i32,
+        max_x: i32,
+        row_y: i32,
+        terminal_max_y: i32,
+        element_width: i32,
+    ) -> i32 {
+        let cols =
+            terminal_bounds::max_element_row_cols(x, max_x, row_y, terminal_max_y, element_width);
+        let gutter = self.message_gutter_screen_row_range();
+        message_gutter::clip_cols_to_avoid_wrapping_into_row(
+            cols,
+            x,
+            max_x,
+            message_gutter::row_printing_wraps_into_gutter_block(gutter, row_y),
+        )
+    }
+
     pub(super) fn apply_gutter_message(&mut self, message: String) {
         let now = Instant::now();
         let already_visible = self
@@ -125,12 +178,12 @@ impl RuntimeUi {
         message_pair: i16,
         indicator_pair: i16,
     ) {
-        let row_cols = terminal_bounds::cols_for_printing(0, max_x, screen_y, max_y) as usize;
+        let row_cols = self.cols_for_printing_respecting_message_gutter(0, max_x, screen_y, max_y) as usize;
         if row_cols == 0 {
             return;
         }
 
-        self.fill_solid(screen_y, 0, row_cols as i32, 1, message_pair);
+        self.fill_solid_overlay(screen_y, 0, row_cols as i32, 1, message_pair);
 
         let message_cols = line.message_text.chars().count();
         let indicator_cols = line
@@ -176,7 +229,7 @@ impl RuntimeUi {
                 continue;
             }
             self.win.mv(screen_y, 0);
-            let cols = terminal_bounds::cols_for_printing(0, max_x, screen_y, max_y);
+            let cols = self.cols_for_printing_respecting_message_gutter(0, max_x, screen_y, max_y);
             for _ in 0..cols {
                 self.win.addch(' ');
             }

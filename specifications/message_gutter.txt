@@ -18,3 +18,6 @@
        - The message gutter will change in size to accommodate the newer messages
           - There can only be one message displayed in the message gutter at a time
           - Minimally redraw the areas of the screen previously covered by the message gutter if the new message makes the message gutter smaller than before
+ - Is never redrawn unless a new message is displayed or when the existing message is updated
+    - Element reflows from adding/modifying elements will *not* cause a redraw of the message gutter
+    - Scrolling entire screen does not cause message gutter to be redrawn

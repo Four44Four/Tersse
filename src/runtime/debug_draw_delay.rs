@@ -25,7 +25,7 @@ impl RuntimeUi {
 
         let color = debug_draw_delay_color(DEBUG_DRAW_DELAY_COLOR);
         let pair = self.color_pair(color, color);
-        self.fill_solid(screen_y, 0, w, h, pair);
+        self.fill_solid_overlay(screen_y, 0, w, h, pair);
         self.win.refresh();
         std::thread::sleep(Duration::from_millis(DEBUG_DRAW_DELAY_MS));
     }

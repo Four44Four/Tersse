@@ -1,6 +1,7 @@
 use tersse::pure::message_gutter::{
-    apply_message, element_row_intersects_gutter_screen_rows, gutter_rows_to_restore,
-    gutter_screen_rows, hide_message, layout_message_gutter_lines, message_gutter_height,
+    apply_message, clip_cols_to_avoid_wrapping_into_row, element_row_intersects_gutter_screen_rows,
+    gutter_rows_to_restore, gutter_screen_rows, hide_message, layout_message_gutter_lines,
+    message_gutter_height, row_printing_wraps_into_gutter_block,
     title_intersects_gutter_screen_rows, MessageGutterState, MsgGutterSide,
 };
 
@@ -96,6 +97,23 @@ fn bottom_gutter_screen_rows_stay_within_visible_content() {
             assert!(row_is_visible(screen_y, 23));
         }
     }
+}
+
+#[test]
+fn row_above_bottom_gutter_must_clip_printable_columns() {
+    let gutter_rows = gutter_screen_rows(MsgGutterSide::Bottom, 1, 23);
+    assert!(row_printing_wraps_into_gutter_block(gutter_rows.clone(), 21));
+    assert!(!row_printing_wraps_into_gutter_block(gutter_rows, 20));
+
+    let full_width_cols = 80;
+    assert_eq!(
+        clip_cols_to_avoid_wrapping_into_row(full_width_cols, 0, 79, true),
+        79
+    );
+    assert_eq!(
+        clip_cols_to_avoid_wrapping_into_row(full_width_cols, 0, 79, false),
+        full_width_cols
+    );
 }
 
 #[test]

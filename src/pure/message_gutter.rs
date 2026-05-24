@@ -119,6 +119,27 @@ fn append_multi_message_indicator(
     }
 }
 
+/// Whether printing on `screen_y` can wrap the cursor into the first row of `gutter_rows`.
+pub fn row_printing_wraps_into_gutter_block(
+    gutter_rows: std::ops::Range<i32>,
+    screen_y: i32,
+) -> bool {
+    !gutter_rows.is_empty() && screen_y + 1 == gutter_rows.start
+}
+
+/// Limits printable columns so ncurses does not wrap into the row below.
+pub fn clip_cols_to_avoid_wrapping_into_row(
+    cols: i32,
+    x: i32,
+    max_x: i32,
+    next_row_is_protected: bool,
+) -> i32 {
+    if !next_row_is_protected || cols <= 0 {
+        return cols;
+    }
+    cols.min((max_x - x).max(0))
+}
+
 /// Returns absolute terminal row indices occupied by the gutter.
 pub fn gutter_screen_rows(
     side: MsgGutterSide,

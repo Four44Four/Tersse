@@ -14,15 +14,15 @@
  - Text display fields
     - Can scroll
     - Can update in realtime
- - *Message gutter
+ - Message gutter
     - Can be placed at the top or bottom of screen
     - Option can expand to fit any msg, or be limited to specific height
+ - *Message screen
+    - Realtime message log
  - *Help screen
     - Displays all keybinds and any tips needed to use
  - *Keybind screen
     - Displays buttons for rebinding actions
- - *Message screen
-    - Realtime message log
  - *File explorer
     - Option: Render diffs made on disk
  - *File renderer

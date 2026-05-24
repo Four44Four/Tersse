@@ -65,7 +65,11 @@ impl RuntimeUi {
         self.auto_reflow_for_dynamic_heights();
         self.clamp_screen_scroll_offset();
         self.sync_focus_flags();
-        self.win.erase();
+        if self.message_gutter.visible {
+            self.clear_screen_for_draw();
+        } else {
+            self.win.erase();
+        }
 
         if let Some(title) = &self.title {
             self.draw_title(title.clone());
@@ -77,7 +81,6 @@ impl RuntimeUi {
         }
 
         self.draw_cursor_for_active_text_input();
-        self.draw_message_gutter_overlay();
         self.win.refresh();
         // A full-screen draw supersedes any incremental queue redraw plan (e.g. marks
         // accumulated while creating elements before the first frame).
@@ -156,7 +159,6 @@ impl RuntimeUi {
         }
 
         self.draw_cursor_for_active_text_input();
-        self.draw_message_gutter_overlay();
         self.win.refresh();
     }
 
@@ -170,7 +172,6 @@ impl RuntimeUi {
         }
 
         self.draw_cursor_for_active_text_input();
-        self.draw_message_gutter_overlay();
         self.win.refresh();
     }
 
@@ -193,7 +194,6 @@ impl RuntimeUi {
         }
 
         self.draw_cursor_for_active_text_input();
-        self.draw_message_gutter_overlay();
         self.win.refresh();
     }
 
@@ -223,7 +223,9 @@ impl RuntimeUi {
         };
         self.win.attron(COLOR_PAIR(pair as u64));
         let title_y = self.scrolled_y(0);
-        if !terminal_bounds::row_is_visible(title_y, self.win.get_max_y()) {
+        if !terminal_bounds::row_is_visible(title_y, self.win.get_max_y())
+            || self.is_message_gutter_screen_row(title_y)
+        {
             return;
         }
         self.win.mv(title_y, col);
@@ -252,14 +254,14 @@ impl RuntimeUi {
         let (max_y, max_x) = self.win.get_max_yx();
         let x = location.x as i32;
         let y = self.scrolled_y(location.y as i32);
-        if !terminal_bounds::row_is_visible(y, max_y) {
+        if !terminal_bounds::row_is_visible(y, max_y) || self.is_message_gutter_screen_row(y) {
             return;
         }
         let (_, draw_h) = terminal_bounds::clip_rect(x, y, width.max(1) as i32, 1, max_x, max_y);
         if draw_h <= 0 {
             return;
         }
-        let row_cols = terminal_bounds::cols_for_printing(x, max_x, y, max_y) as usize;
+        let row_cols = self.cols_for_printing_respecting_message_gutter(x, max_x, y, max_y) as usize;
         let draw_width = width.max(1).min(row_cols);
 
         let label = crate::pure::button::truncate_label(&text, draw_width);
@@ -315,7 +317,7 @@ impl RuntimeUi {
             return;
         }
 
-        self.fill_solid_rows(y, x, draw_w, logical_rows, base_pair);
+        self.fill_solid_rows(y, x, draw_w, logical_rows, base_pair, true);
 
         let state = TextInputState {
             text: text.clone(),
@@ -332,7 +334,10 @@ impl RuntimeUi {
         for line_idx in visible_lines {
             let line_idx = line_idx as usize;
             let row_y = y + line_idx as i32;
-            let max_cols = terminal_bounds::max_element_row_cols(
+            if self.is_message_gutter_screen_row(row_y) {
+                continue;
+            }
+            let max_cols = self.max_element_row_cols_respecting_message_gutter(
                 x,
                 max_x,
                 row_y,
@@ -373,7 +378,10 @@ impl RuntimeUi {
                 continue;
             }
             let row_y = y + line_idx;
-            let max_cols = terminal_bounds::max_element_row_cols(
+            if self.is_message_gutter_screen_row(row_y) {
+                continue;
+            }
+            let max_cols = self.max_element_row_cols_respecting_message_gutter(
                 x,
                 max_x,
                 row_y,
@@ -440,10 +448,12 @@ impl RuntimeUi {
         self.win.attron(COLOR_PAIR(pair as u64));
         for (row, line_idx) in range.enumerate() {
             let row_y = y + row as i32;
-            if !terminal_bounds::row_is_visible(row_y, max_y) {
+            if !terminal_bounds::row_is_visible(row_y, max_y)
+                || self.is_message_gutter_screen_row(row_y)
+            {
                 continue;
             }
-            let row_cols = terminal_bounds::max_element_row_cols(
+            let row_cols = self.max_element_row_cols_respecting_message_gutter(
                 x,
                 max_x,
                 row_y,
@@ -463,12 +473,29 @@ impl RuntimeUi {
         if w <= 0 || h <= 0 {
             return;
         }
-        self.fill_solid_rows(y, x, w, h, pair);
+        self.fill_solid_rows(y, x, w, h, pair, true);
+    }
+
+    pub(in crate::runtime) fn fill_solid_overlay(&self, y: i32, x: i32, w: i32, h: i32, pair: i16) {
+        let (max_y, max_x) = self.win.get_max_yx();
+        let (w, h) = terminal_bounds::clip_rect(x, y, w, h, max_x, max_y);
+        if w <= 0 || h <= 0 {
+            return;
+        }
+        self.fill_solid_rows(y, x, w, h, pair, false);
     }
 
     /// Fills a solid background across `logical_rows` rows, clipping width to the terminal
     /// and skipping rows that are off-screen (including above the viewport when scrolled).
-    fn fill_solid_rows(&self, y: i32, x: i32, w: i32, logical_rows: i32, pair: i16) {
+    fn fill_solid_rows(
+        &self,
+        y: i32,
+        x: i32,
+        w: i32,
+        logical_rows: i32,
+        pair: i16,
+        skip_message_gutter: bool,
+    ) {
         let (max_y, max_x) = self.win.get_max_yx();
         let w = w.min(terminal_bounds::cols_visible_from(x, max_x)).max(0);
         if w <= 0 || logical_rows <= 0 {
@@ -479,7 +506,15 @@ impl RuntimeUi {
         self.win.attron(COLOR_PAIR(pair as u64));
         for row in visible_rows {
             let row_y = y + row;
-            let row_w = terminal_bounds::cols_for_printing(x, max_x, row_y, max_y).min(w);
+            if skip_message_gutter && self.is_message_gutter_screen_row(row_y) {
+                continue;
+            }
+            let row_w = if skip_message_gutter {
+                self.cols_for_printing_respecting_message_gutter(x, max_x, row_y, max_y)
+                    .min(w)
+            } else {
+                terminal_bounds::cols_for_printing(x, max_x, row_y, max_y).min(w)
+            };
             if row_w <= 0 {
                 continue;
             }
@@ -514,11 +549,17 @@ impl RuntimeUi {
         let x = input.location.x as i32;
         let y = self.scrolled_y(input.location.y as i32);
         let row_y = y + line as i32;
-        if !terminal_bounds::row_is_visible(row_y, max_y) {
+        if !terminal_bounds::row_is_visible(row_y, max_y) || self.is_message_gutter_screen_row(row_y) {
             let _ = curs_set(0);
             return;
         }
-        let max_cols = terminal_bounds::max_element_row_cols(x, max_x, row_y, max_y, width as i32);
+        let max_cols = self.max_element_row_cols_respecting_message_gutter(
+            x,
+            max_x,
+            row_y,
+            max_y,
+            width as i32,
+        );
         if col as i32 >= max_cols {
             let _ = curs_set(0);
             return;
@@ -577,7 +618,6 @@ impl RuntimeUi {
         }
 
         self.draw_cursor_for_active_text_input();
-        self.draw_message_gutter_overlay();
         self.win.refresh();
     }
 
@@ -587,10 +627,28 @@ impl RuntimeUi {
         if row_y >= max_y {
             return;
         }
-        self.win.mv(row_y.max(0), 0);
         for y in row_y.max(0)..max_y {
+            if self.is_message_gutter_screen_row(y) {
+                continue;
+            }
             self.win.mv(y, 0);
-            for _ in 0..max_x.max(0) {
+            let cols = self.cols_for_printing_respecting_message_gutter(0, max_x, y, max_y);
+            for _ in 0..cols {
+                self.win.addch(' ');
+            }
+        }
+    }
+
+    fn clear_screen_for_draw(&mut self) {
+        let (max_y, max_x) = self.win.get_max_yx();
+        let max_row = terminal_bounds::content_max_y(max_y);
+        for y in 0..=max_row {
+            if self.is_message_gutter_screen_row(y) {
+                continue;
+            }
+            self.win.mv(y, 0);
+            let cols = self.cols_for_printing_respecting_message_gutter(0, max_x, y, max_y);
+            for _ in 0..cols {
                 self.win.addch(' ');
             }
         }
