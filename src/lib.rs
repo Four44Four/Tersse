@@ -14,7 +14,7 @@ pub use element_store::{ElementId, ElementStore, StoredElement};
 pub use pure::element_placement::{ElementBounds, ElementPlacement, ParentSide};
 pub use runtime::{
     ButtonConfig, ButtonHandler, ElementConfig, FocusStyle, RuntimeUi, Style, TextDisplayConfig,
-    TextInputConfig, TextInputStyle, UiSession, runtime_clamp_text_display_dimensions,
+    TextInputConfig, TextInputStyle, UiRuntime, UiSession, runtime_clamp_text_display_dimensions,
     runtime_render_height_for_button, runtime_render_height_for_text_display,
     runtime_render_height_for_text_input_text, runtime_terminal_color_code,
     runtime_text_input_state_snapshot,
@@ -24,7 +24,7 @@ pub use constants::UI_REDRAW_DEBOUNCE_QUEUE_UPDATE_MS;
 pub mod prelude {
     pub use crate::{
         ButtonConfig, Color, ElementId, ElementPlacement, FocusStyle, Location, ParentSide,
-        RuntimeUi, Style, TextDisplayConfig, TextInputConfig, TextInputStyle, UiSession,
+        RuntimeUi, Style, TextDisplayConfig, TextInputConfig, TextInputStyle, UiRuntime, UiSession,
     };
 }
 

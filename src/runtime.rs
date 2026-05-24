@@ -28,6 +28,29 @@ pub use types::{
 };
 pub use ui_session::UiSession;
 
+/// Cloneable handle to the shared Tokio runtime used by [`RuntimeUi`].
+///
+/// Use this to spawn async background tasks without creating a separate runtime.
+#[derive(Clone, Debug)]
+pub struct UiRuntime {
+    handle: tokio::runtime::Handle,
+}
+
+impl UiRuntime {
+    pub(crate) fn new(handle: tokio::runtime::Handle) -> Self {
+        Self { handle }
+    }
+
+    /// Spawns a future on the shared runtime.
+    pub fn spawn<F>(&self, future: F) -> tokio::task::JoinHandle<F::Output>
+    where
+        F: std::future::Future + Send + 'static,
+        F::Output: Send + 'static,
+    {
+        self.handle.spawn(future)
+    }
+}
+
 use element_store::ElementStore;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -82,7 +105,7 @@ pub struct RuntimeUi {
     ui_queue: ui_session::UiQueue,
     ui_signal_tx: ui_session::UiSignalSender,
     ui_signal_rx: ui_session::UiSignalReceiver,
-    keyboard_runtime: Option<tokio::runtime::Runtime>,
+    async_runtime: Option<tokio::runtime::Runtime>,
     keyboard_task: Option<tokio::task::JoinHandle<()>>,
     has_rendered_first_frame: bool,
     ui_queue_redraw_pending: bool,

@@ -23,9 +23,9 @@ impl RuntimeUi {
 
         let ui_queue = ui_session::new_ui_queue();
         let (ui_signal_tx, ui_signal_rx) = ui_session::new_ui_signal_channel();
-        let keyboard_runtime =
-            tokio::runtime::Runtime::new().expect("Failed to create keyboard runtime");
-        let keyboard_task = Some(spawn_keyboard_task(&keyboard_runtime, ui_signal_tx.clone()));
+        let async_runtime =
+            tokio::runtime::Runtime::new().expect("Failed to create async runtime");
+        let keyboard_task = Some(spawn_keyboard_task(&async_runtime, ui_signal_tx.clone()));
 
         let mut ui = Self {
             win,
@@ -44,7 +44,7 @@ impl RuntimeUi {
             ui_queue,
             ui_signal_tx,
             ui_signal_rx,
-            keyboard_runtime: Some(keyboard_runtime),
+            async_runtime: Some(async_runtime),
             keyboard_task,
             has_rendered_first_frame: false,
             ui_queue_redraw_pending: false,
@@ -67,6 +67,19 @@ impl RuntimeUi {
     /// Returns a cloneable handle for queueing UI updates from other threads.
     pub fn ui_session(&self) -> UiSession {
         UiSession::new(Arc::clone(&self.ui_queue), self.ui_signal_tx.clone())
+    }
+
+    /// Returns a cloneable handle to the shared Tokio runtime.
+    ///
+    /// Use this to spawn async background tasks without creating a separate runtime.
+    pub fn runtime(&self) -> super::UiRuntime {
+        let handle = self
+            .async_runtime
+            .as_ref()
+            .expect("async runtime missing")
+            .handle()
+            .clone();
+        super::UiRuntime::new(handle)
     }
 
     /// Runs the UI event loop until the user quits.
@@ -193,7 +206,7 @@ impl Drop for RuntimeUi {
         if let Some(task) = self.keyboard_task.take() {
             task.abort();
         }
-        if let Some(runtime) = self.keyboard_runtime.take() {
+        if let Some(runtime) = self.async_runtime.take() {
             runtime.shutdown_timeout(Duration::from_millis(50));
         }
         let _ = curs_set(1);

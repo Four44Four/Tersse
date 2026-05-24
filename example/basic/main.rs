@@ -5,7 +5,6 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
 use tersse::prelude::*;
@@ -52,7 +51,7 @@ impl App {
         }
     }
 
-    fn handle_foo(&mut self, ui: &mut RuntimeUi, rt: &Runtime, session: &UiSession) {
+    fn handle_foo(&mut self, ui: &mut RuntimeUi, runtime: UiRuntime, session: &UiSession) {
         self.foo_flash.take().inspect(|task| task.abort());
         let id = self.upsert_flash_display(
             ui,
@@ -63,14 +62,14 @@ impl App {
         );
         *self.foo_text_id.lock().unwrap() = Some(id);
         self.foo_flash = Some(schedule_flash_removal(
-            rt,
+            runtime,
             session.clone(),
             Arc::clone(&self.foo_text_id),
             FLASH_FOO,
         ));
     }
 
-    fn handle_bar(&mut self, ui: &mut RuntimeUi, rt: &Runtime, session: &UiSession) {
+    fn handle_bar(&mut self, ui: &mut RuntimeUi, runtime: UiRuntime, session: &UiSession) {
         self.bar_flash.take().inspect(|task| task.abort());
         let id = self.upsert_flash_display(
             ui,
@@ -81,7 +80,7 @@ impl App {
         );
         *self.bar_text_id.lock().unwrap() = Some(id);
         self.bar_flash = Some(schedule_flash_removal(
-            rt,
+            runtime,
             session.clone(),
             Arc::clone(&self.bar_text_id),
             FLASH_BAR,
@@ -172,12 +171,12 @@ impl App {
 }
 
 fn schedule_flash_removal(
-    rt: &Runtime,
+    runtime: UiRuntime,
     session: UiSession,
     id_slot: Arc<Mutex<Option<ElementId>>>,
     after: Duration,
 ) -> JoinHandle<()> {
-    rt.spawn(async move {
+    runtime.spawn(async move {
         sleep(after).await;
         session.queue_update(move |ui| {
             if let Some(element_id) = id_slot.lock().unwrap().take() {
@@ -188,15 +187,15 @@ fn schedule_flash_removal(
 }
 
 fn main() {
-    let rt = Arc::new(Runtime::new().expect("Failed to create Tokio runtime"));
     let mut ui = RuntimeUi::new();
+    let runtime = ui.runtime();
     let session = ui.ui_session();
     let app: Rc<RefCell<Option<App>>> = Rc::new(RefCell::new(None));
 
     ui.set_title(screen_title());
 
     let foo_app = Rc::clone(&app);
-    let foo_rt = Arc::clone(&rt);
+    let foo_runtime = runtime.clone();
     let foo_session = session.clone();
     let foo_id = ui.create_button(ButtonConfig {
         label: "Foo".to_string(),
@@ -209,12 +208,12 @@ fn main() {
                 .borrow_mut()
                 .as_mut()
                 .unwrap()
-                .handle_foo(ui, &foo_rt, &foo_session);
+                .handle_foo(ui, foo_runtime.clone(), &foo_session);
         }),
     });
 
     let bar_app = Rc::clone(&app);
-    let bar_rt = Arc::clone(&rt);
+    let bar_runtime = runtime.clone();
     let bar_session = session.clone();
     let bar_id = ui.create_button(ButtonConfig {
         label: "Bar".to_string(),
@@ -227,7 +226,7 @@ fn main() {
                 .borrow_mut()
                 .as_mut()
                 .unwrap()
-                .handle_bar(ui, &bar_rt, &bar_session);
+                .handle_bar(ui, bar_runtime.clone(), &bar_session);
         }),
     });
 
