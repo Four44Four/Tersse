@@ -65,6 +65,9 @@ impl RuntimeUi {
         let indicator_pair = self.color_pair(MSG_GUTTER_MULTI_MSG_COLOR, MSG_GUTTER_BG_COLOR);
         let row_range = gutter_screen_rows(MSG_GUTTER_SIDE, height, max_y);
 
+        #[cfg(debug_draw_do_delay)]
+        self.debug_before_draw_message_gutter(row_range.start, height as i32, max_x, max_y);
+
         for (idx, line) in lines.iter().take(height).enumerate() {
             let screen_y = row_range.start + idx as i32;
             if !terminal_bounds::row_is_visible(screen_y, max_y) {

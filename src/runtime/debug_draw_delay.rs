@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use crate::constants::{DebugDrawDelayColor, DEBUG_DRAW_DELAY_COLOR, DEBUG_DRAW_DELAY_MS};
+use crate::pure::terminal_bounds;
 use crate::Color;
 
 use super::layout::{
@@ -10,6 +11,25 @@ use super::types::RuntimeElement;
 use super::RuntimeUi;
 
 impl RuntimeUi {
+    pub(super) fn debug_before_draw_message_gutter(
+        &mut self,
+        screen_y: i32,
+        height: i32,
+        max_x: i32,
+        max_y: i32,
+    ) {
+        let (w, h) = terminal_bounds::clip_rect(0, screen_y, max_x + 1, height, max_x, max_y);
+        if w <= 0 || h <= 0 {
+            return;
+        }
+
+        let color = debug_draw_delay_color(DEBUG_DRAW_DELAY_COLOR);
+        let pair = self.color_pair(color, color);
+        self.fill_solid(screen_y, 0, w, h, pair);
+        self.win.refresh();
+        std::thread::sleep(Duration::from_millis(DEBUG_DRAW_DELAY_MS));
+    }
+
     pub(super) fn debug_before_draw_existing_element(&mut self, id: usize) {
         let Some((x, y, w, h)) = self.existing_element_screen_rect(id) else {
             return;
