@@ -2,7 +2,7 @@ mod style;
 
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use tokio::runtime::Runtime;
@@ -28,8 +28,8 @@ struct App {
     press_id: ElementId,
     clear_id: Option<ElementId>,
     result_id: Option<ElementId>,
-    foo_text_id: Option<ElementId>,
-    bar_text_id: Option<ElementId>,
+    foo_text_id: Arc<Mutex<Option<ElementId>>>,
+    bar_text_id: Arc<Mutex<Option<ElementId>>>,
     foo_flash: Option<JoinHandle<()>>,
     bar_flash: Option<JoinHandle<()>>,
     result_visible: bool,
@@ -44,8 +44,8 @@ impl App {
             press_id,
             clear_id: None,
             result_id: None,
-            foo_text_id: None,
-            bar_text_id: None,
+            foo_text_id: Arc::new(Mutex::new(None)),
+            bar_text_id: Arc::new(Mutex::new(None)),
             foo_flash: None,
             bar_flash: None,
             result_visible: false,
@@ -54,24 +54,36 @@ impl App {
 
     fn handle_foo(&mut self, ui: &mut RuntimeUi, rt: &Runtime, session: &UiSession) {
         self.foo_flash.take().inspect(|task| task.abort());
-        let id = self.upsert_flash_display(ui, self.foo_id, self.foo_text_id, 0.5, "Button 1");
-        self.foo_text_id = Some(id);
+        let id = self.upsert_flash_display(
+            ui,
+            self.foo_id,
+            *self.foo_text_id.lock().unwrap(),
+            0.5,
+            "Button 1",
+        );
+        *self.foo_text_id.lock().unwrap() = Some(id);
         self.foo_flash = Some(schedule_flash_removal(
             rt,
             session.clone(),
-            id,
+            Arc::clone(&self.foo_text_id),
             FLASH_FOO,
         ));
     }
 
     fn handle_bar(&mut self, ui: &mut RuntimeUi, rt: &Runtime, session: &UiSession) {
         self.bar_flash.take().inspect(|task| task.abort());
-        let id = self.upsert_flash_display(ui, self.bar_id, self.bar_text_id, 1.5, "Button 2");
-        self.bar_text_id = Some(id);
+        let id = self.upsert_flash_display(
+            ui,
+            self.bar_id,
+            *self.bar_text_id.lock().unwrap(),
+            1.5,
+            "Button 2",
+        );
+        *self.bar_text_id.lock().unwrap() = Some(id);
         self.bar_flash = Some(schedule_flash_removal(
             rt,
             session.clone(),
-            id,
+            Arc::clone(&self.bar_text_id),
             FLASH_BAR,
         ));
     }
@@ -103,11 +115,7 @@ impl App {
             }));
         }
 
-        if self.result_visible {
-            if let Some(result_id) = self.result_id {
-                let _ = ui.set_text_display_text(result_id, result);
-            }
-        } else {
+        if !self.result_visible {
             self.result_id = Some(ui.create_text_display(TextDisplayConfig {
                 placement: ElementPlacement::relative_to(
                     self.press_id,
@@ -149,18 +157,8 @@ impl App {
             ParentSide::Bottom,
             Location::default(),
         );
-        if let Some(id) = display_id {
-            let config = TextDisplayConfig {
-                placement: placement.clone(),
-                width,
-                height: 1,
-                focus_number,
-                style: locked_like_style(),
-                initial_text: text.to_string(),
-            };
-            if ui.update_text_display(id, config) {
-                return id;
-            }
+        if !display_id.is_none() {
+            return display_id.expect("what");
         }
         ui.create_text_display(TextDisplayConfig {
             placement,
@@ -176,13 +174,15 @@ impl App {
 fn schedule_flash_removal(
     rt: &Runtime,
     session: UiSession,
-    id: ElementId,
+    id_slot: Arc<Mutex<Option<ElementId>>>,
     after: Duration,
 ) -> JoinHandle<()> {
     rt.spawn(async move {
         sleep(after).await;
         session.queue_update(move |ui| {
-            let _ = ui.remove_and_reflow(id);
+            if let Some(element_id) = id_slot.lock().unwrap().take() {
+                let _ = ui.remove_and_reflow(element_id);
+            }
         });
     })
 }
