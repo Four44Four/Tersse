@@ -6,6 +6,8 @@ use pancurses::Window;
 use crate::ScreenTitle;
 
 mod colors;
+#[cfg(debug_draw_do_delay)]
+mod debug_draw_delay;
 mod core;
 mod element_store;
 mod elements;
@@ -83,4 +85,8 @@ pub struct RuntimeUi {
     keyboard_runtime: Option<tokio::runtime::Runtime>,
     keyboard_task: Option<tokio::task::JoinHandle<()>>,
     has_rendered_first_frame: bool,
+    ui_queue_redraw_pending: bool,
+    ui_queue_redraw_plan: crate::pure::ui_redraw::ElementRedrawPlan,
+    draining_ui_queue: bool,
+    sync_layout_redraw_pending: bool,
 }

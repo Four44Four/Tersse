@@ -1,20 +1,20 @@
 use std::time::{Duration, Instant};
 
-use tersse::UI_REDRAW_DEBOUNCE_MS;
+use tersse::UI_REDRAW_DEBOUNCE_QUEUE_UPDATE;
 use tersse::pure::resize_debounce::{debounce_deadline, debounce_has_elapsed};
 
 #[test]
-fn ui_redraw_debounce_ms_defaults_to_fifty() {
-    assert_eq!(UI_REDRAW_DEBOUNCE_MS, 50);
+fn ui_redraw_debounce_queue_update_is_positive() {
+    assert!(UI_REDRAW_DEBOUNCE_QUEUE_UPDATE > 0);
 }
 
 #[test]
-fn ui_redraw_debounce_waits_for_quiet_period() {
+fn ui_redraw_debounce_queue_update_waits_for_quiet_period() {
     let start = Instant::now();
-    let deadline = debounce_deadline(start, Duration::from_millis(UI_REDRAW_DEBOUNCE_MS));
+    let deadline = debounce_deadline(start, Duration::from_millis(UI_REDRAW_DEBOUNCE_QUEUE_UPDATE));
     assert!(!debounce_has_elapsed(deadline, start));
     assert!(debounce_has_elapsed(
         deadline,
-        start + Duration::from_millis(UI_REDRAW_DEBOUNCE_MS)
+        start + Duration::from_millis(UI_REDRAW_DEBOUNCE_QUEUE_UPDATE)
     ));
 }

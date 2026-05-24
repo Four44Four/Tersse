@@ -38,10 +38,12 @@ impl RuntimeUi {
         self.recompute_all_relative_locations();
         self.restore_focus(focused_id);
         self.refresh_height_cache();
+        self.mark_element_and_below_changed(id);
         id
     }
 
     pub fn update_button(&mut self, id: ElementId, config: ButtonConfig) -> bool {
+        let old_bounds = self.element_bounds(id);
         if !self.elements.contains_id(id.as_internal()) {
             return false;
         }
@@ -58,6 +60,12 @@ impl RuntimeUi {
         self.recompute_all_relative_locations();
         self.restore_focus(focused_id);
         self.refresh_height_cache();
+        self.mark_from_y_changed(
+            old_bounds
+                .zip(self.element_bounds(id))
+                .map(|(old, new)| old.y.min(new.y))
+                .unwrap_or_default(),
+        );
         true
     }
 
@@ -84,10 +92,12 @@ impl RuntimeUi {
         self.restore_focus(focused_id);
         self.invalidate_text_input_layout_cache(id);
         self.refresh_height_cache();
+        self.mark_element_and_below_changed(id);
         id
     }
 
     pub fn update_text_input(&mut self, id: ElementId, config: TextInputConfig) -> bool {
+        let old_bounds = self.element_bounds(id);
         if !self.elements.contains_id(id.as_internal()) {
             return false;
         }
@@ -105,6 +115,12 @@ impl RuntimeUi {
         self.restore_focus(focused_id);
         self.invalidate_text_input_layout_cache(id);
         self.refresh_height_cache();
+        self.mark_from_y_changed(
+            old_bounds
+                .zip(self.element_bounds(id))
+                .map(|(old, new)| old.y.min(new.y))
+                .unwrap_or_default(),
+        );
         true
     }
 
@@ -123,10 +139,12 @@ impl RuntimeUi {
         self.recompute_all_relative_locations();
         self.restore_focus(focused_id);
         self.refresh_height_cache();
+        self.mark_element_and_below_changed(id);
         id
     }
 
     pub fn update_text_display(&mut self, id: ElementId, config: TextDisplayConfig) -> bool {
+        let old_bounds = self.element_bounds(id);
         if !self.elements.contains_id(id.as_internal()) {
             return false;
         }
@@ -143,6 +161,12 @@ impl RuntimeUi {
         self.recompute_all_relative_locations();
         self.restore_focus(focused_id);
         self.refresh_height_cache();
+        self.mark_from_y_changed(
+            old_bounds
+                .zip(self.element_bounds(id))
+                .map(|(old, new)| old.y.min(new.y))
+                .unwrap_or_default(),
+        );
         true
     }
 
@@ -167,15 +191,20 @@ impl RuntimeUi {
             self.pull_elements_up_from(min_y, rows, &[]);
         }
         self.refresh_height_cache();
+        self.mark_from_y_changed(bounds.y);
         true
     }
 
     pub fn remove_element(&mut self, id: ElementId) -> bool {
+        let old_y = self.element_location(id).map(|location| location.y);
         let focused_id = self.current_focused_id();
         if self.elements.remove(id.as_internal()).is_some() {
             self.restore_focus(focused_id);
             self.cached_heights.remove(&id.as_internal());
             self.invalidate_text_input_layout_cache(id);
+            if let Some(y) = old_y {
+                self.mark_from_y_changed(y);
+            }
             true
         } else {
             false
@@ -215,6 +244,7 @@ impl RuntimeUi {
         }
         self.shift_element_subtree(id, delta_x as i16, delta_y);
         self.recompute_all_relative_locations();
+        self.mark_from_y_changed(old_location.y.min(location.y));
         true
     }
 
@@ -224,10 +254,12 @@ impl RuntimeUi {
         width: usize,
         height: usize,
     ) -> bool {
+        let anchor_y = self.element_location(id).map(|location| location.y).unwrap_or_default();
         if let Some(RuntimeElement::TextDisplay(display)) = self.element_mut_by_id(id) {
             display.width = width.max(1);
             display.height = height.max(1);
             self.recompute_all_relative_locations();
+            self.mark_from_y_changed(anchor_y);
             true
         } else {
             false
@@ -238,6 +270,7 @@ impl RuntimeUi {
         if let Some(RuntimeElement::TextDisplay(display)) = self.element_mut_by_id(id) {
             display.display.text = text.into();
             display.scroll = 0;
+            self.mark_element_only_changed(id);
             true
         } else {
             false
@@ -252,12 +285,22 @@ impl RuntimeUi {
     }
 
     pub fn set_text_input_text(&mut self, id: ElementId, text: impl Into<String>) -> bool {
+        let Some(old_height) = self.text_input_render_height(id) else {
+            return false;
+        };
+        let anchor_y = self.element_location(id).map(|location| location.y).unwrap_or_default();
         if let Some(RuntimeElement::TextInput(input)) = self.element_mut_by_id(id) {
             input.field.text = text.into();
             input.cursor = input.field.text.chars().count();
             input.selection_anchor = None;
             self.invalidate_text_input_layout_cache(id);
             self.recompute_all_relative_locations();
+            let new_height = self.text_input_render_height(id).unwrap_or(old_height);
+            if old_height != new_height {
+                self.mark_from_y_changed(anchor_y);
+            } else {
+                self.mark_element_only_changed(id);
+            }
             true
         } else {
             false
@@ -270,6 +313,7 @@ impl RuntimeUi {
             if locked {
                 input.selection_anchor = None;
             }
+            self.mark_element_only_changed(id);
             true
         } else {
             false

@@ -1,4 +1,6 @@
 # Sprint 1
+ - Centralize keyboard Tokio runtime with example/basic Tokio runtime
+    - UI has a single Tokio runtime that can be used to schedule other bg tasks ?
  - Use aHash for element storage hashing
  - Ensure that only the thread that started the application can update the UI
     - (all updates to UI MUST be synchronized to original UI instance's thread)

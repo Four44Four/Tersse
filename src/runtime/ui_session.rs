@@ -38,8 +38,8 @@ impl UiSession {
 
     /// Queues `work` to run on the UI thread during the next event-loop frame.
     ///
-    /// The UI is redrawn after `work` finishes, respecting the UI redraw debounce
-    /// interval. This method is safe to call from any thread or async runtime.
+    /// The UI is redrawn after `work` finishes, respecting the queue update redraw
+    /// debounce interval. This method is safe to call from any thread or async runtime.
     pub fn queue_update(&self, work: impl FnOnce(&mut RuntimeUi) + Send + 'static) {
         self.queue.lock().unwrap().push(Box::new(work));
         let _ = self.signal_tx.send(UiSignal::QueueUpdated);
@@ -51,16 +51,24 @@ pub(crate) fn ui_queue_has_pending(queue: &UiQueue) -> bool {
 }
 
 impl RuntimeUi {
-    pub(crate) fn drain_ui_queue(&mut self) {
+    pub(crate) fn drain_ui_queue(&mut self) -> bool {
         let works: Vec<UiWork> = {
             let mut pending = self.ui_queue.lock().unwrap();
             std::mem::take(&mut *pending)
         };
+        if works.is_empty() {
+            return false;
+        }
+        self.draining_ui_queue = true;
         for work in works {
             work(self);
             let _ = self.tick_resize_debounce();
-            self.request_draw();
+            if self.ui_queue_redraw_pending {
+                self.request_draw();
+            }
         }
+        self.draining_ui_queue = false;
+        true
     }
 
     pub(crate) fn ui_queue_has_pending(&self) -> bool {

@@ -1,9 +1,15 @@
- - There is a UI refresh debounce constant
  - There is an internal queue of tasks that can be scheduled by a user externally from asychronous or concurrent contexts safely
+    - There is a UI redraw debounce constant for UI session update queue driven UI redraws
     - This queue will be activated when any tasks are inserted to run the first tasks synchronously on the thread context of the UI until there are no more tasks
     - Tasks inserted into this queue by any means can safely modify the UI without triggering race conditions
-    - UI should be refreshed after execution of each task, respecting the UI debounce constant
+    - Any UI redraw triggered as specified in ./specifications/tui_elements_redrawing.txt due to code ran inside of each update queue function will be executed with a delay of the UI redraw debounce constant for UI session update queue
+       - If more than 1 set UI redraw of elements is triggered in less than the debounce delay constant:
+          - Merge the UI redraw target elements into a single redraw of all effected elements
+       - If this debounce is cleared due to keyboard input, run the (merged) redraw immediately
  - Keyboard input across all elements should be received asynchronously and non-blockingly and not consume CPU cycles while user is idle (no use of continuous polling for input events)
-    - UI should be refreshed when keyboard input is asynchronously received, respecting the UI debounce constant
+    - If a keyboard input is detected:
+       - UI redraw debounce constant for UI session update queue is cleared immediately
+          - If there is a pending redraw of specific elements from a UI session update queue function running:
+             - It will immediately redraw them when the keyboard event is processed, keeping all elements in sync
  - When UI is idle and user is idle:
     - There should be no UI refreshes performed, and minimal or no CPU cycles should be consumed by any background loop

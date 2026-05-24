@@ -1,7 +1,10 @@
 use std::time::{Duration, Instant};
 
-use crate::constants::UI_REDRAW_DEBOUNCE_MS;
+use crate::constants::UI_REDRAW_DEBOUNCE_QUEUE_UPDATE_MS;
+use crate::pure::focus_order;
 use crate::pure::resize_debounce;
+use crate::pure::ui_redraw;
+use crate::ElementId;
 use crate::pure::scroll_view;
 use crate::pure::terminal_bounds;
 use crate::pure::text_input::{self, TextInputState};
@@ -14,27 +17,26 @@ use super::RuntimeUi;
 
 impl RuntimeUi {
     pub(super) fn request_draw(&mut self) {
-        self.redraw_debounce_until = Some(resize_debounce::debounce_deadline(
-            Instant::now(),
-            Duration::from_millis(UI_REDRAW_DEBOUNCE_MS),
-        ));
+        self.redraw_debounce_until.get_or_insert_with(|| {
+            resize_debounce::debounce_deadline(
+                Instant::now(),
+                Duration::from_millis(UI_REDRAW_DEBOUNCE_QUEUE_UPDATE_MS),
+            )
+        });
     }
 
-    /// Applies a debounced UI redraw. Returns true when the screen was redrawn.
+    /// Applies a debounced UI redraw for queued UiSession updates.
     pub(super) fn tick_redraw_debounce(&mut self) -> bool {
-        let Some(until) = self.redraw_debounce_until else {
-            return false;
-        };
-        if !resize_debounce::debounce_has_elapsed(until, Instant::now()) {
-            return false;
-        }
-        self.redraw_debounce_until = None;
-        self.draw();
-        true
+        self.flush_pending_queue_redraw(false)
     }
 
     pub(super) fn next_debounce_deadline(&self) -> Option<Instant> {
-        match (self.resize_debounce_until, self.redraw_debounce_until) {
+        let queue_deadline = if self.ui_queue_redraw_pending {
+            self.redraw_debounce_until
+        } else {
+            None
+        };
+        match (self.resize_debounce_until, queue_deadline) {
             (Some(resize), Some(redraw)) => Some(resize.min(redraw)),
             (Some(resize), None) => Some(resize),
             (None, Some(redraw)) => Some(redraw),
@@ -42,17 +44,17 @@ impl RuntimeUi {
         }
     }
 
-    pub(super) fn flush_pending_redraw(&mut self) {
+    pub(super) fn flush_pending_redraw(&mut self) -> bool {
         let resize_changed = self.tick_resize_debounce();
         if self.is_resize_debounce_active() {
-            return;
+            return false;
         }
         if resize_changed {
-            self.redraw_debounce_until = None;
             self.draw();
-            return;
+            self.clear_pending_queue_redraw();
+            return true;
         }
-        let _ = self.tick_redraw_debounce();
+        self.tick_redraw_debounce()
     }
 
     pub fn draw(&mut self) {
@@ -67,16 +69,136 @@ impl RuntimeUi {
 
         let draw_order: Vec<usize> = self.elements.focus_order_ids();
         for id in draw_order {
-            match self.elements.get(id) {
-                Some(RuntimeElement::Button(_)) => self.draw_button(id),
-                Some(RuntimeElement::TextInput(_)) => self.draw_text_input(id),
-                Some(RuntimeElement::TextDisplay(_)) => self.draw_text_display(id),
-                None => {}
+            self.draw_existing_element(id);
+        }
+
+        self.draw_cursor_for_active_text_input();
+        self.win.refresh();
+    }
+
+    pub(super) fn mark_element_only_changed(&mut self, id: ElementId) {
+        self.ui_queue_redraw_plan.mark_element(id.as_internal());
+        self.ui_queue_redraw_pending = true;
+        if self.draining_ui_queue {
+            self.request_draw();
+        } else {
+            // Non-queued mutations should flush immediately on the current frame.
+            self.redraw_debounce_until = None;
+        }
+    }
+
+    pub(super) fn mark_element_and_below_changed(&mut self, id: ElementId) {
+        let Some(location) = self.element_location(id) else {
+            return;
+        };
+        self.mark_from_y_changed(location.y);
+    }
+
+    pub(super) fn mark_from_y_changed(&mut self, y: u16) {
+        self.ui_queue_redraw_plan.mark_from_y(y);
+        self.ui_queue_redraw_pending = true;
+        if self.draining_ui_queue {
+            self.request_draw();
+        } else {
+            // Non-queued mutations should flush immediately on the current frame.
+            self.redraw_debounce_until = None;
+        }
+    }
+
+    pub(super) fn finish_non_keyboard_redraw(&mut self) {
+        if self.sync_layout_redraw_pending {
+            self.draw();
+            self.sync_layout_redraw_pending = false;
+            self.clear_pending_queue_redraw();
+            return;
+        }
+        let _ = self.flush_pending_redraw();
+    }
+
+    pub(super) fn finish_terminal_input_redraw(&mut self, full_immediate: bool) {
+        if full_immediate || self.sync_layout_redraw_pending {
+            self.draw();
+            self.sync_layout_redraw_pending = false;
+            self.clear_pending_queue_redraw();
+            return;
+        }
+        let _ = self.flush_pending_redraw();
+    }
+
+    pub(super) fn flush_pending_queue_redraw_for_keyboard(&mut self) {
+        self.redraw_debounce_until = None;
+        let _ = self.flush_pending_queue_redraw(true);
+    }
+
+    pub(super) fn redraw_keyboard_focused_elements(
+        &mut self,
+        previous: Option<ElementId>,
+        current: Option<ElementId>,
+    ) {
+        self.auto_reflow_for_dynamic_heights();
+        self.clamp_screen_scroll_offset();
+        self.sync_focus_flags();
+
+        let ids = focus_order::keyboard_redraw_element_ids(
+            previous.map(ElementId::as_internal),
+            current.map(ElementId::as_internal),
+        );
+        for id in ids {
+            self.draw_existing_element(id);
+        }
+
+        self.draw_cursor_for_active_text_input();
+        self.win.refresh();
+    }
+
+    pub(super) fn redraw_keyboard_current_element(&mut self, current: Option<ElementId>) {
+        self.auto_reflow_for_dynamic_heights();
+        self.clamp_screen_scroll_offset();
+        self.sync_focus_flags();
+
+        if let Some(id) = current.map(ElementId::as_internal) {
+            self.draw_existing_element(id);
+        }
+
+        self.draw_cursor_for_active_text_input();
+        self.win.refresh();
+    }
+
+    pub(super) fn redraw_text_input_and_below(&mut self, id: ElementId) {
+        self.auto_reflow_for_dynamic_heights();
+        self.clamp_screen_scroll_offset();
+        self.sync_focus_flags();
+
+        let Some(anchor) = self.element_location(id).map(|loc| loc.y) else {
+            return;
+        };
+        let draw_order = self.elements.focus_order_ids();
+        for element_id in draw_order {
+            let Some(location) = self.element_location(ElementId::from_internal(element_id)) else {
+                continue;
+            };
+            if location.y >= anchor {
+                self.draw_existing_element(element_id);
             }
         }
 
         self.draw_cursor_for_active_text_input();
         self.win.refresh();
+    }
+
+    fn draw_existing_element(&mut self, id: usize) {
+        #[cfg(debug_draw_do_delay)]
+        self.debug_before_draw_existing_element(id);
+        self.draw_element(id);
+    }
+
+    fn draw_element(&mut self, id: usize) {
+        match self.elements.get(id) {
+            Some(RuntimeElement::Button(_)) => self.draw_button(id),
+            Some(RuntimeElement::TextInput(_)) => self.draw_text_input(id),
+            Some(RuntimeElement::TextDisplay(_)) => self.draw_text_display(id),
+            None => {}
+        }
     }
 
     fn draw_title(&mut self, title: crate::ScreenTitle) {
@@ -324,7 +446,7 @@ impl RuntimeUi {
         self.win.attroff(COLOR_PAIR(pair as u64));
     }
 
-    fn fill_solid(&self, y: i32, x: i32, w: i32, h: i32, pair: i16) {
+    pub(in crate::runtime) fn fill_solid(&self, y: i32, x: i32, w: i32, h: i32, pair: i16) {
         let (max_y, max_x) = self.win.get_max_yx();
         let (w, h) = terminal_bounds::clip_rect(x, y, w, h, max_x, max_y);
         if w <= 0 || h <= 0 {
@@ -392,5 +514,73 @@ impl RuntimeUi {
         }
         let _ = curs_set(1);
         self.win.mv(row_y, x + col as i32);
+    }
+
+    fn clear_pending_queue_redraw(&mut self) {
+        self.ui_queue_redraw_pending = false;
+        self.ui_queue_redraw_plan.clear();
+        self.redraw_debounce_until = None;
+    }
+
+    fn flush_pending_queue_redraw(&mut self, keyboard_immediate: bool) -> bool {
+        let now = Instant::now();
+        if !ui_redraw::should_flush_debounced_queue_redraw(
+            self.ui_queue_redraw_pending,
+            self.ui_queue_has_pending(),
+            self.redraw_debounce_until,
+            now,
+        ) && !keyboard_immediate
+        {
+            return false;
+        }
+        if !self.ui_queue_redraw_pending {
+            return false;
+        }
+        self.draw_pending_ui_queue_plan();
+        self.clear_pending_queue_redraw();
+        true
+    }
+
+    fn draw_pending_ui_queue_plan(&mut self) {
+        let plan = std::mem::take(&mut self.ui_queue_redraw_plan);
+        if plan.is_empty() {
+            return;
+        }
+
+        self.auto_reflow_for_dynamic_heights();
+        self.clamp_screen_scroll_offset();
+        self.sync_focus_flags();
+
+        if let Some(anchor_y) = plan.redraw_from_y() {
+            self.clear_rows_from(anchor_y);
+        }
+
+        let draw_order: Vec<usize> = self.elements.focus_order_ids();
+        for id in draw_order {
+            let Some(location) = self.element_location(ElementId::from_internal(id)) else {
+                continue;
+            };
+            if plan.should_draw(id, location.y) {
+                self.draw_existing_element(id);
+            }
+        }
+
+        self.draw_cursor_for_active_text_input();
+        self.win.refresh();
+    }
+
+    fn clear_rows_from(&self, anchor_y: u16) {
+        let (max_y, max_x) = self.win.get_max_yx();
+        let row_y = self.scrolled_y(anchor_y as i32);
+        if row_y >= max_y {
+            return;
+        }
+        self.win.mv(row_y.max(0), 0);
+        for y in row_y.max(0)..max_y {
+            self.win.mv(y, 0);
+            for _ in 0..max_x.max(0) {
+                self.win.addch(' ');
+            }
+        }
     }
 }

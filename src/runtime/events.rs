@@ -9,6 +9,31 @@ use super::types::{RuntimeElement, UiEvent};
 use super::RuntimeUi;
 
 impl RuntimeUi {
+    fn text_input_height_change(&mut self, id: crate::ElementId, before_text: &str) -> bool {
+        let width = match self.element_by_id(id) {
+            Some(RuntimeElement::TextInput(input)) => input.field.width.max(1),
+            _ => 1,
+        };
+        let before = super::layout::render_height_for_text_input_text(
+            before_text,
+            width,
+        );
+        let after = self.text_input_render_height(id).unwrap_or(before);
+        after != before
+    }
+
+    pub(super) fn handle_text_input_redraw_after_edit(
+        &mut self,
+        id: crate::ElementId,
+        before_text: &str,
+    ) {
+        if self.text_input_height_change(id, before_text) {
+            self.redraw_text_input_and_below(id);
+        } else {
+            self.redraw_keyboard_current_element(Some(id));
+        }
+    }
+
     pub(super) fn handle_display_scroll(&mut self, key: TerminalKey) -> bool {
         let Some(id) = self.current_focused_id() else {
             return false;
@@ -67,9 +92,11 @@ impl RuntimeUi {
         if input.field.locked {
             return false;
         }
+        let before_text = input.field.text.clone();
         let state = self.text_input_state(id);
         if let Some(pasted) = text_input::paste_text(&state, paste) {
             self.apply_text_input_paste(id, pasted);
+            self.handle_text_input_redraw_after_edit(id, &before_text);
         }
         true
     }
@@ -81,6 +108,7 @@ impl RuntimeUi {
         let Some(RuntimeElement::TextInput(input)) = self.element_by_id(id) else {
             return false;
         };
+        let before_text = input.field.text.clone();
 
         let locked = input.field.locked;
         if matches!(key, TerminalKey::Up | TerminalKey::Down) {
@@ -113,6 +141,7 @@ impl RuntimeUi {
                 if let Some((updated, copied)) = text_input::copy_selection(&state) {
                     if clipboard::set_text(&copied) {
                         self.set_text_input_state(id, updated);
+                        self.handle_text_input_redraw_after_edit(id, &before_text);
                     }
                 }
                 return true;
@@ -121,6 +150,7 @@ impl RuntimeUi {
                 if let Some((updated, cut)) = text_input::cut_selection(&state) {
                     if clipboard::set_text(&cut) {
                         self.set_text_input_state(id, updated);
+                        self.handle_text_input_redraw_after_edit(id, &before_text);
                     }
                 }
                 return true;
@@ -138,6 +168,7 @@ impl RuntimeUi {
         };
 
         self.apply_text_input_state(id, next_state);
+        self.handle_text_input_redraw_after_edit(id, &before_text);
         true
     }
 

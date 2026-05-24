@@ -1,5 +1,6 @@
 use tersse::pure::focus_order::{
-    index_for_focused_id, next_index, normalize_index, prev_index, sorted_ids,
+    index_for_focused_id, keyboard_redraw_element_ids, next_index, normalize_index, prev_index,
+    sorted_ids,
 };
 
 #[test]
@@ -63,4 +64,17 @@ fn prev_index_retreats_until_first_element() {
 #[test]
 fn prev_index_stays_on_first_element() {
     assert_eq!(prev_index(0, 3), 0);
+}
+
+#[test]
+fn keyboard_redraw_element_ids_redraws_current_only_when_focus_unchanged() {
+    assert_eq!(keyboard_redraw_element_ids(None, None), Vec::<usize>::new());
+    assert_eq!(keyboard_redraw_element_ids(None, Some(1)), vec![1]);
+    assert_eq!(keyboard_redraw_element_ids(Some(1), Some(1)), vec![1]);
+}
+
+#[test]
+fn keyboard_redraw_element_ids_redraws_previous_and_current_on_focus_change() {
+    assert_eq!(keyboard_redraw_element_ids(Some(1), Some(2)), vec![1, 2]);
+    assert_eq!(keyboard_redraw_element_ids(Some(2), Some(1)), vec![2, 1]);
 }

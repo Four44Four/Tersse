@@ -43,6 +43,16 @@ pub fn next_index(current: usize, len: usize) -> usize {
     }
 }
 
+/// Element ids to redraw after keyboard input: the focused element, plus the
+/// previously focused element when focus changed.
+pub fn keyboard_redraw_element_ids(previous: Option<usize>, current: Option<usize>) -> Vec<usize> {
+    match (previous, current) {
+        (Some(prev), Some(cur)) if prev != cur => vec![prev, cur],
+        (_, Some(cur)) => vec![cur],
+        _ => Vec::new(),
+    }
+}
+
 /// Moves focus backward, staying on the first element when already there.
 pub fn prev_index(current: usize, len: usize) -> usize {
     if len == 0 {

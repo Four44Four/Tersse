@@ -47,6 +47,10 @@ impl RuntimeUi {
             keyboard_runtime: Some(keyboard_runtime),
             keyboard_task,
             has_rendered_first_frame: false,
+            ui_queue_redraw_pending: false,
+            ui_queue_redraw_plan: crate::pure::ui_redraw::ElementRedrawPlan::default(),
+            draining_ui_queue: false,
+            sync_layout_redraw_pending: false,
         };
         let _ = ui.reload_screen_after_resize();
         ui
@@ -111,7 +115,7 @@ impl RuntimeUi {
         match signal {
             ui_session::UiSignal::QueueUpdated => {
                 self.drain_ui_queue();
-                self.flush_pending_redraw();
+                self.finish_non_keyboard_redraw();
                 UiEvent::None
             }
             ui_session::UiSignal::Terminal(event) => self.handle_terminal_poll(event),
@@ -120,48 +124,68 @@ impl RuntimeUi {
     }
 
     fn handle_terminal_poll(&mut self, event: TerminalPoll) -> UiEvent {
-        let ui_event = match event {
+        let keyboard_input =
+            matches!(&event, TerminalPoll::Paste(_) | TerminalPoll::Key(_));
+        if keyboard_input {
+            self.flush_pending_queue_redraw_for_keyboard();
+        }
+        match event {
             TerminalPoll::Resized { .. } => {
                 self.note_terminal_resize();
+                self.drain_ui_queue();
+                let _ = self.flush_pending_redraw();
                 UiEvent::None
             }
             TerminalPoll::Paste(paste) => {
+                let current = self.current_focused_id();
                 let _ = self.handle_text_input_paste(&paste);
+                self.redraw_keyboard_current_element(current);
+                self.finish_terminal_input_redraw(false);
                 UiEvent::None
             }
-            TerminalPoll::Key(key) => self.handle_key(key),
-        };
-        self.drain_ui_queue();
-        self.request_draw();
-        self.flush_pending_redraw();
-        ui_event
+            TerminalPoll::Key(key) => {
+                let previous = self.current_focused_id();
+                let (ui_event, full_immediate) = self.handle_key(key);
+                if matches!(ui_event, UiEvent::Quit) {
+                    return ui_event;
+                }
+                let current = self.current_focused_id();
+                if full_immediate {
+                    self.draw();
+                } else {
+                    self.redraw_keyboard_focused_elements(previous, current);
+                }
+                self.finish_terminal_input_redraw(full_immediate);
+                ui_event
+            }
+        }
     }
 
-    fn handle_key(&mut self, key: TerminalKey) -> UiEvent {
+    fn handle_key(&mut self, key: TerminalKey) -> (UiEvent, bool) {
         if self.handle_screen_scroll(key) {
-            return UiEvent::None;
+            return (UiEvent::None, true);
         }
 
         if self.handle_display_scroll(key) {
-            return UiEvent::None;
+            return (UiEvent::None, false);
         }
 
         if self.handle_text_input_editing(key) {
-            return UiEvent::None;
+            return (UiEvent::None, false);
         }
 
         match key {
-            TerminalKey::Quit | TerminalKey::Escape => UiEvent::Quit,
+            TerminalKey::Quit | TerminalKey::Escape => (UiEvent::Quit, false),
             TerminalKey::Up | TerminalKey::Left { .. } => {
                 self.focus_prev();
-                UiEvent::None
+                (UiEvent::None, false)
             }
             TerminalKey::Down | TerminalKey::Right { .. } => {
                 self.focus_next();
-                UiEvent::None
+                (UiEvent::None, false)
             }
-            TerminalKey::Enter | TerminalKey::Space => self.activate_button_on_focus(),
-            _ => UiEvent::None,
+            TerminalKey::Enter | TerminalKey::Space => (self.activate_button_on_focus(), false),
+            _ => (UiEvent::None, false),
         }
     }
 }

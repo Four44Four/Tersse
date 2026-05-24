@@ -19,7 +19,7 @@ pub use runtime::{
     runtime_render_height_for_text_input_text, runtime_terminal_color_code,
     runtime_text_input_state_snapshot,
 };
-pub use constants::UI_REDRAW_DEBOUNCE_MS;
+pub use constants::UI_REDRAW_DEBOUNCE_QUEUE_UPDATE_MS;
 
 pub mod prelude {
     pub use crate::{
