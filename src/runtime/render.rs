@@ -36,12 +36,16 @@ impl RuntimeUi {
         } else {
             None
         };
-        match (self.resize_debounce_until, queue_deadline) {
+        let primary = match (self.resize_debounce_until, queue_deadline) {
             (Some(resize), Some(redraw)) => Some(resize.min(redraw)),
             (Some(resize), None) => Some(resize),
             (None, Some(redraw)) => Some(redraw),
             (None, None) => None,
-        }
+        };
+        [primary, self.message_gutter_expiry_deadline()]
+            .into_iter()
+            .flatten()
+            .min()
     }
 
     pub(super) fn flush_pending_redraw(&mut self) -> bool {
@@ -73,6 +77,7 @@ impl RuntimeUi {
         }
 
         self.draw_cursor_for_active_text_input();
+        self.draw_message_gutter_overlay();
         self.win.refresh();
         // A full-screen draw supersedes any incremental queue redraw plan (e.g. marks
         // accumulated while creating elements before the first frame).
@@ -151,6 +156,7 @@ impl RuntimeUi {
         }
 
         self.draw_cursor_for_active_text_input();
+        self.draw_message_gutter_overlay();
         self.win.refresh();
     }
 
@@ -164,6 +170,7 @@ impl RuntimeUi {
         }
 
         self.draw_cursor_for_active_text_input();
+        self.draw_message_gutter_overlay();
         self.win.refresh();
     }
 
@@ -186,10 +193,11 @@ impl RuntimeUi {
         }
 
         self.draw_cursor_for_active_text_input();
+        self.draw_message_gutter_overlay();
         self.win.refresh();
     }
 
-    fn draw_existing_element(&mut self, id: usize) {
+    pub(in crate::runtime) fn draw_existing_element(&mut self, id: usize) {
         #[cfg(debug_draw_do_delay)]
         self.debug_before_draw_existing_element(id);
         self.draw_element(id);
@@ -204,7 +212,7 @@ impl RuntimeUi {
         }
     }
 
-    fn draw_title(&mut self, title: crate::ScreenTitle) {
+    pub(in crate::runtime) fn draw_title(&mut self, title: crate::ScreenTitle) {
         let pair = self.color_pair(title.fg_color, title.bg_color);
         let max_x = self.win.get_max_x().max(1);
         let text_len = title.text.chars().count() as i32;
@@ -569,6 +577,7 @@ impl RuntimeUi {
         }
 
         self.draw_cursor_for_active_text_input();
+        self.draw_message_gutter_overlay();
         self.win.refresh();
     }
 

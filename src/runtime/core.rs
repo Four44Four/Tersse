@@ -9,6 +9,7 @@ use tokio::sync::oneshot;
 
 use crate::terminal_input;
 use crate::terminal_input::{TerminalKey, TerminalPoll};
+use crate::pure::message_gutter::MessageGutterState;
 use crate::ScreenTitle;
 
 use super::element_store::ElementStore;
@@ -133,6 +134,8 @@ impl RuntimeUi {
             ui_queue_redraw_plan: crate::pure::ui_redraw::ElementRedrawPlan::default(),
             draining_ui_queue: false,
             sync_layout_redraw_pending: false,
+            message_gutter: MessageGutterState::default(),
+            message_gutter_expires_at: None,
         };
         let _ = ui.reload_screen_after_resize();
         ui
@@ -209,6 +212,7 @@ impl RuntimeUi {
         match signal {
             ui_session::UiSignal::QueueUpdated => {
                 self.drain_ui_queue();
+                self.tick_message_gutter_expiry();
                 self.finish_non_keyboard_redraw();
                 UiEvent::None
             }

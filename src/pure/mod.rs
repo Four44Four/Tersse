@@ -8,6 +8,7 @@ pub mod focus_order;
 pub mod focus_store;
 pub mod keyboard;
 pub mod layout_reflow;
+pub mod message_gutter;
 pub mod resize_debounce;
 pub mod screen_scroll;
 pub mod scroll_view;

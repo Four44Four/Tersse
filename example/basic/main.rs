@@ -14,6 +14,8 @@ use style::{button_style, locked_like_style, screen_title, text_input_style};
 const FLASH_FOO: Duration = Duration::from_secs(2);
 const FLASH_BAR: Duration = Duration::from_secs(5);
 const FOO_BAR_BUTTON_WIDTH: usize = 5;
+const MUNG_BUTTON_WIDTH: usize = 5;
+const MUNG_BAR_MARGIN: u16 = 3;
 const INPUT_WIDTH: usize = 20;
 const PRESS_LABEL: &str = "Press Me !!";
 const CLEAR_LABEL: &str = "Clear Result";
@@ -230,6 +232,25 @@ fn main() {
         }),
     });
 
+    let mung_session = session.clone();
+    let _mung_id = ui.create_button(ButtonConfig {
+        label: "Mung".to_string(),
+        width: MUNG_BUTTON_WIDTH,
+        placement: ElementPlacement::relative_to(
+            bar_id,
+            ParentSide::Right,
+            Location {
+                x: MUNG_BAR_MARGIN,
+                y: 0,
+            },
+        ),
+        focus_number: 1.5,
+        style: button_style(),
+        on_press: Box::new(move |_ui| {
+            mung_session.send_message(format!("{}What ?", random_base64_chars(5)));
+        }),
+    });
+
     let input_id = ui.create_text_input(TextInputConfig {
         width: INPUT_WIDTH,
         placement: ElementPlacement::absolute(Location { x: 0, y: 4 }),
@@ -264,4 +285,19 @@ fn main() {
 fn build_result_text(input: &str) -> String {
     let reversed = input.chars().rev().collect::<String>();
     reversed.repeat(10)
+}
+
+fn random_base64_chars(count: usize) -> String {
+    const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let seed = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let mut state = seed;
+    (0..count)
+        .map(|_| {
+            state = state.wrapping_mul(6364136223846793005).wrapping_add(1);
+            CHARSET[(state as usize) % CHARSET.len()] as char
+        })
+        .collect()
 }

@@ -4,3 +4,8 @@
  - Expose a function to queue a another function/closure to run synchronously in the context of the UI thread
     - The running of that inputted function/closure will trigger a UI update immediately after it concludes running
     - This API function should be safely callable from any thread or async environment to trigger a UI update asynchrously or concurrently without causing race conditions within UI
+ - Expose a function to send a message string
+    - This will trigger the messsage gutter to either appear, or be updated
+    - See ./specifications/message_gutter.txt
+    - Should be thread-safe
+       - Can call from async or multi-threaded environments

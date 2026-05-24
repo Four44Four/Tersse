@@ -1,0 +1,20 @@
+ - A dedicated area of the screen to display text temporarily when the message function is called
+    - Visually is a solid configurable background color with left aligned text showing the message
+    - Is a screenspace rendering entity
+       - Is not an element on the page itself
+       - Cannot be scrolled with the screen scrolling keybinds
+       - Cannot be focused on
+ - Can be on the top or bottom of the terminal
+ - Can expand in height up to a specified maximum amount of lines to accommodate a long message that wraps around width of terminal
+ - Messages displayed will persist up to a specified amount of time
+    - When the current message expires, the message gutter is hidden and the elements that it was covering will be visible again
+    - When the message gutter is hidden:
+       - Minimize redrawing to the area that the message gutter's rendering affected
+ - Starts out as invisible
+    - But will appear when a message is sent
+    - If 1 or more messages are sent before the previous message expired:
+       - A configurable string will be displayed in a configurable color with a 1 character margin to the end of the message
+          - If this wraps around the width of the terminal, increase the height of the message gutter by 1 
+       - The message gutter will change in size to accommodate the newer messages
+          - There can only be one message displayed in the message gutter at a time
+          - Minimally redraw the areas of the screen previously covered by the message gutter if the new message makes the message gutter smaller than before

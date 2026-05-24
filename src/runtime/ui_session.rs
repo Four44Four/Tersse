@@ -44,6 +44,17 @@ impl UiSession {
         self.queue.lock().unwrap().push(Box::new(work));
         let _ = self.signal_tx.send(UiSignal::QueueUpdated);
     }
+
+    /// Displays `message` in the message gutter overlay.
+    ///
+    /// If a message is already visible, the gutter updates in place and shows the
+    /// multi-message indicator. Safe to call from any thread or async runtime.
+    pub fn send_message(&self, message: impl Into<String> + Send + 'static) {
+        let message = message.into();
+        self.queue_update(move |ui| {
+            ui.apply_gutter_message(message);
+        });
+    }
 }
 
 pub(crate) fn ui_queue_has_pending(queue: &UiQueue) -> bool {

@@ -14,6 +14,7 @@ mod elements;
 mod events;
 mod focus;
 mod layout;
+mod message_gutter;
 mod placement;
 mod render;
 mod resize;
@@ -50,6 +51,8 @@ impl UiRuntime {
         self.handle.spawn(future)
     }
 }
+
+use crate::pure::message_gutter::MessageGutterState;
 
 use element_store::ElementStore;
 
@@ -111,4 +114,6 @@ pub struct RuntimeUi {
     ui_queue_redraw_plan: crate::pure::ui_redraw::ElementRedrawPlan,
     draining_ui_queue: bool,
     sync_layout_redraw_pending: bool,
+    message_gutter: MessageGutterState,
+    message_gutter_expires_at: Option<Instant>,
 }
