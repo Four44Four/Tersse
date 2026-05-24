@@ -156,6 +156,23 @@ pub(crate) fn text_input_state_from_parts(
 }
 
 impl RuntimeElement {
+    pub fn is_button(&self) -> bool {
+        self.on_activate.is_some() && self.text_input.is_none()
+    }
+
+    pub fn is_fit_static_display(&self) -> bool {
+        self.text_input.is_none()
+            && self.on_activate.is_none()
+            && matches!(self.height_mode, ElementHeightMode::FitContent)
+    }
+
+    pub fn fixed_viewport_height(&self) -> Option<usize> {
+        match self.height_mode {
+            ElementHeightMode::Fixed(height) => Some(height.max(1)),
+            ElementHeightMode::FitContent => None,
+        }
+    }
+
     pub fn from_config(id: usize, config: ElementConfig, location: Location) -> Self {
         Self {
             id,

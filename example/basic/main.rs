@@ -19,6 +19,8 @@ const PRESS_LABEL: &str = "Press Me !!";
 const CLEAR_LABEL: &str = "Clear Result";
 const DISPLAY_WIDTH: usize = 80;
 const RESULT_HEIGHT: usize = 12;
+const FOO_BAR_BUTTON_WIDTH: usize = 5;
+const BUTTON_HEIGHT: usize = 1;
 
 struct App {
     foo_id: ElementId,
@@ -95,8 +97,7 @@ impl App {
         let clear_x = PRESS_LABEL.chars().count().max(1) + 1;
 
         if self.clear_id.is_none() {
-            self.clear_id = Some(ui.create_element(button_element(
-                CLEAR_LABEL,
+            self.clear_id = Some(ui.create_element(button(
                 ElementPlacement::relative_to(
                     self.input_id,
                     ParentSide::Bottom,
@@ -105,31 +106,30 @@ impl App {
                         y: 0,
                     },
                 ),
+                CLEAR_LABEL.chars().count().max(1),
+                BUTTON_HEIGHT,
                 4.0,
+                button_style(),
+                CLEAR_LABEL,
                 Box::new(move |ui| {
                     app.borrow_mut().as_mut().unwrap().handle_clear(ui);
                 }),
-                None,
             )));
         }
 
         if !self.result_visible {
-            self.result_id = Some(
-                ui.create_element(
-                    ElementConfig::new(
-                        ElementPlacement::relative_to(
-                            self.press_id,
-                            ParentSide::Bottom,
-                            Location::default(),
-                        ),
-                        DISPLAY_WIDTH,
-                        5.0,
-                        locked_like_style(),
-                    )
-                    .with_fixed_height(RESULT_HEIGHT)
-                    .with_text(result),
+            self.result_id = Some(ui.create_element(static_text_fixed(
+                ElementPlacement::relative_to(
+                    self.press_id,
+                    ParentSide::Bottom,
+                    Location::default(),
                 ),
-            );
+                DISPLAY_WIDTH,
+                RESULT_HEIGHT,
+                5.0,
+                locked_like_style(),
+                result,
+            )));
             self.result_visible = true;
         }
     }
@@ -159,11 +159,14 @@ impl App {
         if !display_id.is_none() {
             return display_id.expect("what");
         }
-        ui.create_element(
-            ElementConfig::new(placement, width, focus_number, locked_like_style())
-                .with_fixed_height(1)
-                .with_text(text),
-        )
+        ui.create_element(static_text_fixed(
+            placement,
+            width,
+            1,
+            focus_number,
+            locked_like_style(),
+            text,
+        ))
     }
 }
 
@@ -194,10 +197,13 @@ fn main() {
     let foo_app = Rc::clone(&app);
     let foo_runtime = runtime.clone();
     let foo_session = session.clone();
-    let foo_id = ui.create_element(button_element(
-        "Foo",
+    let foo_id = ui.create_element(button(
         ElementPlacement::absolute(Location { x: 0, y: 2 }),
+        FOO_BAR_BUTTON_WIDTH,
+        BUTTON_HEIGHT,
         0.0,
+        button_style(),
+        "Foo",
         Box::new(move |ui| {
             foo_app.borrow_mut().as_mut().unwrap().handle_foo(
                 ui,
@@ -205,16 +211,18 @@ fn main() {
                 &foo_session,
             );
         }),
-        Some(5)
     ));
 
     let bar_app = Rc::clone(&app);
     let bar_runtime = runtime.clone();
     let bar_session = session.clone();
-    let bar_id = ui.create_element(button_element(
-        "Bar",
+    let bar_id = ui.create_element(button(
         ElementPlacement::absolute(Location { x: 0, y: 3 }),
+        FOO_BAR_BUTTON_WIDTH,
+        BUTTON_HEIGHT,
         1.0,
+        button_style(),
+        "Bar",
         Box::new(move |ui| {
             bar_app.borrow_mut().as_mut().unwrap().handle_bar(
                 ui,
@@ -222,12 +230,10 @@ fn main() {
                 &bar_session,
             );
         }),
-        Some(5)
     ));
 
     let mung_session = session.clone();
-    let _mung_id = ui.create_element(button_element(
-        "Mung",
+    let _mung_id = ui.create_element(button(
         ElementPlacement::relative_to(
             bar_id,
             ParentSide::Right,
@@ -236,29 +242,33 @@ fn main() {
                 y: 0,
             },
         ),
+        FOO_BAR_BUTTON_WIDTH,
+        BUTTON_HEIGHT,
         1.5,
+        button_style(),
+        "Mung",
         Box::new(move |_ui| {
             mung_session.send_message(format!("{}What ?", random_base64_chars(5)));
         }),
-        Some(5)
     ));
 
-    let input_id = ui.create_element(
-        ElementConfig::new(
-            ElementPlacement::absolute(Location { x: 0, y: 4 }),
-            INPUT_WIDTH,
-            2.0,
-            text_element_style(),
-        )
-        .with_fit_content_height()
-        .with_text_input(TextInputBehavior::new(text_input_style()).with_locked(false)),
-    );
+    let input_id = ui.create_element(text_input_fit_height(
+        ElementPlacement::absolute(Location { x: 0, y: 4 }),
+        INPUT_WIDTH,
+        2.0,
+        text_element_style(),
+        text_input_style(),
+        String::new(),
+        false,
+    ));
 
     let press_app = Rc::clone(&app);
-    let press_id = ui.create_element(button_element(
-        PRESS_LABEL,
+    let press_id = ui.create_element(button_fit_width(
         ElementPlacement::relative_to(input_id, ParentSide::Bottom, Location::default()),
+        BUTTON_HEIGHT,
         3.0,
+        button_style(),
+        PRESS_LABEL,
         Box::new(move |ui| {
             press_app
                 .borrow_mut()
@@ -266,7 +276,6 @@ fn main() {
                 .unwrap()
                 .handle_press(ui, Rc::clone(&press_app));
         }),
-        None,
     ));
 
     app.borrow_mut()
@@ -278,24 +287,6 @@ fn main() {
 fn build_result_text(input: &str) -> String {
     let reversed = input.chars().rev().collect::<String>();
     reversed.repeat(10)
-}
-
-fn button_element(
-    label: &str,
-    placement: ElementPlacement,
-    focus_number: f64,
-    on_activate: ElementHandler,
-    width: Option<usize>
-) -> ElementConfig {
-    ElementConfig::new(
-        placement,
-        width.unwrap_or(label.chars().count().max(1)),
-        focus_number,
-        button_style(),
-    )
-    .with_fixed_height(1)
-    .with_text(label)
-    .with_on_activate(on_activate)
 }
 
 fn random_base64_chars(count: usize) -> String {

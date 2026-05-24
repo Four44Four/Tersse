@@ -31,6 +31,17 @@ pub fn wrapped_line_count(text: &str, width: usize) -> usize {
     wrapped_lines(text, width).len()
 }
 
+/// Wrapped lines for rendering and scrolling; empty `text` yields one blank line.
+///
+/// Line count matches [`display_row_count`], unlike [`wrapped_lines`] alone.
+pub fn wrapped_lines_for_display(text: &str, width: usize) -> Vec<String> {
+    let mut lines = wrapped_lines(text, width);
+    if lines.is_empty() {
+        lines.push(String::new());
+    }
+    lines
+}
+
 /// Rows to allocate in the UI (at least one row when empty).
 pub fn display_row_count(text: &str, width: usize) -> usize {
     if text.is_empty() {

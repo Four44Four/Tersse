@@ -256,11 +256,10 @@ impl RuntimeUi {
     }
 
     fn element_render_height_by_id(&mut self, id: ElementId) -> Option<usize> {
-        if self.element_by_id(id)?.text_input.is_some() {
-            self.text_input_render_height(id)
-        } else {
-            let element = self.element_by_id(id)?;
-            Some(self.element_render_height(element))
+        let element = self.element_by_id(id)?;
+        if element.text_input.is_some() && element.fixed_viewport_height().is_none() {
+            return self.text_input_render_height(id);
         }
+        Some(self.element_render_height(element))
     }
 }

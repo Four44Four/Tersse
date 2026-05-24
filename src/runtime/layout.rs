@@ -19,18 +19,26 @@ pub(crate) fn render_height_for_text_display(height: usize) -> usize {
 
 impl RuntimeUi {
     pub(super) fn auto_reflow_for_dynamic_heights(&mut self) {
-        let text_input_ids = self
+        let dynamic_ids = self
             .elements
             .iter()
-            .filter_map(|element| element.text_input.as_ref().map(|_| element.id))
+            .filter_map(|element| {
+                if element.text_input.is_some() && element.fixed_viewport_height().is_none() {
+                    return Some(element.id);
+                }
+                if element.is_fit_static_display() {
+                    return Some(element.id);
+                }
+                None
+            })
             .collect::<Vec<_>>();
 
         let mut relayout = false;
-        for id in text_input_ids {
+        for id in dynamic_ids {
             let element_id = ElementId::from_internal(id);
             let old_height = self.cached_heights.get(&id).copied().unwrap_or(1);
             let new_height = self
-                .text_input_render_height(element_id)
+                .dynamic_element_render_height(element_id)
                 .unwrap_or(old_height);
             let delta = layout_reflow::height_delta(old_height, new_height);
             if delta == 0 {
@@ -53,9 +61,17 @@ impl RuntimeUi {
 
     /// Logical row span used for reflow (content height, not viewport-clipped height).
     pub(super) fn element_render_height(&self, element: &RuntimeElement) -> usize {
-        if element.text_input.is_some() {
+        if let Some(height) = element.fixed_viewport_height() {
+            if element.text_input.is_some() || element.on_activate.is_none() {
+                return render_height_for_text_display(height);
+            }
+        }
+        if element.text_input.is_some() || element.is_fit_static_display() {
             let width = element.width.max(1);
             return render_height_for_text_input_text(&element.text, width);
+        }
+        if element.is_button() {
+            return render_height_for_button();
         }
         match element.height_mode {
             super::types::ElementHeightMode::Fixed(height) => {
@@ -65,10 +81,28 @@ impl RuntimeUi {
         }
     }
 
+    pub(super) fn dynamic_element_render_height(&mut self, id: ElementId) -> Option<usize> {
+        let element = self.element_by_id(id)?;
+        if element.fixed_viewport_height().is_some() {
+            return None;
+        }
+        if element.text_input.is_some() {
+            return self.text_input_render_height(id);
+        }
+        if element.is_fit_static_display() {
+            let width = element.width.max(1);
+            return Some(render_height_for_text_input_text(&element.text, width));
+        }
+        None
+    }
+
     pub(super) fn text_input_render_height(&mut self, id: ElementId) -> Option<usize> {
         let element = self.element_by_id(id)?;
         if element.text_input.is_none() {
             return None;
+        }
+        if let Some(height) = element.fixed_viewport_height() {
+            return Some(render_height_for_text_display(height));
         }
         let width = element.width.max(1);
         let text_len = element.text.len();
@@ -101,6 +135,9 @@ impl RuntimeUi {
             let height = match self.element_by_id(element_id) {
                 Some(other) if other.text_input.is_some() => {
                     self.text_input_render_height(element_id).unwrap_or(1)
+                }
+                Some(other) if other.is_fit_static_display() => {
+                    self.dynamic_element_render_height(element_id).unwrap_or(1)
                 }
                 Some(other) => self.element_render_height(other),
                 None => 1,

@@ -192,13 +192,18 @@ impl RuntimeUi {
     }
 
     pub(super) fn runtime_element_bounds(&self, element: &RuntimeElement) -> ElementBounds {
-        let height = if element.text_input.is_some() {
+        let height = if let Some(fixed) = element.fixed_viewport_height() {
+            if element.text_input.is_some() || element.on_activate.is_none() {
+                render_height_for_text_display(fixed)
+            } else {
+                render_height_for_button()
+            }
+        } else if element.is_button() {
+            render_height_for_button()
+        } else if element.text_input.is_some() || element.is_fit_static_display() {
             render_height_for_text_input_text(&element.text, element.width.max(1))
         } else {
-            match element.height_mode {
-                ElementHeightMode::Fixed(height) => render_height_for_text_display(height),
-                ElementHeightMode::FitContent => render_height_for_button(),
-            }
+            render_height_for_text_display(1)
         };
         ElementBounds {
             x: element.location.x,
@@ -288,27 +293,27 @@ impl RuntimeUi {
     fn element_dimensions(&mut self, id: usize) -> Option<(usize, usize)> {
         let element_id = ElementId::from_internal(id);
         let element = self.element_by_id(element_id)?;
-        if element.text_input.is_some() {
-            let width = element.width.max(1);
-            let height = self.text_input_render_height(element_id)?;
-            return Some((width, height));
-        }
         let width = element.width.max(1);
-        let height = match element.height_mode {
-            ElementHeightMode::Fixed(height) => render_height_for_text_display(height),
-            ElementHeightMode::FitContent => render_height_for_button(),
-        };
+        let height = self.element_render_height(element);
         Some((width, height))
     }
 
     pub(super) fn element_config_dimensions(config: &ElementConfig) -> (usize, usize) {
         let width = config.width.max(1);
-        let height = if config.text_input.is_some() {
-            render_height_for_text_input_text(&config.text, width)
-        } else {
-            match config.height_mode {
-                ElementHeightMode::Fixed(height) => render_height_for_text_display(height),
-                ElementHeightMode::FitContent => render_height_for_button(),
+        let height = match config.height_mode {
+            ElementHeightMode::Fixed(height) => {
+                if config.text_input.is_some() || config.on_activate.is_none() {
+                    render_height_for_text_display(height)
+                } else {
+                    render_height_for_button()
+                }
+            }
+            ElementHeightMode::FitContent => {
+                if config.on_activate.is_some() {
+                    render_height_for_button()
+                } else {
+                    render_height_for_text_input_text(&config.text, width)
+                }
             }
         };
         (width, height)

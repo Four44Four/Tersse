@@ -2,6 +2,7 @@
 
 pub mod clipboard;
 mod constants;
+pub mod element_presets;
 mod element_store;
 #[cfg(feature = "pure-tests")]
 pub mod pure;
@@ -11,6 +12,10 @@ mod runtime;
 mod terminal_input;
 
 pub use constants::UI_REDRAW_DEBOUNCE_QUEUE_UPDATE_MS;
+pub use element_presets::{
+    button, button_fit_width, static_text_fit_height, static_text_fixed, text_input_fit_height,
+    text_input_fixed,
+};
 pub use element_store::{ElementId, ElementStore, StoredElement};
 pub use pure::element_placement::{ElementBounds, ElementPlacement, ParentSide};
 pub use runtime::{
@@ -22,9 +27,10 @@ pub use runtime::{
 
 pub mod prelude {
     pub use crate::{
-        Color, ElementConfig, ElementHandler, ElementHeightMode, ElementId, ElementPlacement,
-        FocusStyle, Location, ParentSide, RuntimeUi, Style, TextInputBehavior, TextInputStyle,
-        UiRuntime, UiSession,
+        button, button_fit_width, static_text_fit_height, static_text_fixed, text_input_fit_height,
+        text_input_fixed, Color, ElementConfig, ElementHandler, ElementHeightMode, ElementId,
+        ElementPlacement, FocusStyle, Location, ParentSide, RuntimeUi, Style, TextInputBehavior,
+        TextInputStyle, UiRuntime, UiSession,
     };
 }
 

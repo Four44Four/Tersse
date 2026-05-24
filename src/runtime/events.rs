@@ -1,6 +1,5 @@
 use crate::clipboard;
 use crate::pure::scroll_view;
-use crate::pure::terminal_bounds;
 use crate::pure::text_input;
 use crate::pure::text_wrap;
 use crate::terminal_input::TerminalKey;
@@ -10,12 +9,15 @@ use super::RuntimeUi;
 
 impl RuntimeUi {
     fn text_input_height_change(&mut self, id: crate::ElementId, before_text: &str) -> bool {
-        let width = match self.element_by_id(id) {
-            Some(element) if element.text_input.is_some() => element.width.max(1),
-            _ => 1,
+        let Some(element) = self.element_by_id(id) else {
+            return false;
         };
+        if element.fixed_viewport_height().is_some() {
+            return false;
+        }
+        let width = element.width.max(1);
         let before = super::layout::render_height_for_text_input_text(before_text, width);
-        let after = self.text_input_render_height(id).unwrap_or(before);
+        let after = self.dynamic_element_render_height(id).unwrap_or(before);
         after != before
     }
 
@@ -38,54 +40,34 @@ impl RuntimeUi {
         let Some(element) = self.element_by_id(id) else {
             return false;
         };
-        if element.text_input.is_some() {
-            return false;
-        }
-        if !matches!(
-            element.height_mode,
-            super::types::ElementHeightMode::Fixed(_)
-        ) {
-            return false;
-        }
+        let viewport_rows = match element.fixed_viewport_height() {
+            Some(height) => height,
+            None => return false,
+        };
 
         match key {
             TerminalKey::AltUp => {
-                let Some(display) = self.element_mut_by_id(id) else {
+                let Some(target) = self.element_mut_by_id(id) else {
                     return false;
                 };
-                if display.scroll == 0 {
+                if target.scroll == 0 {
                     return false;
                 }
-                display.scroll = scroll_view::scroll_line_up(display.scroll);
+                target.scroll = scroll_view::scroll_line_up(target.scroll);
                 true
             }
             TerminalKey::AltDown => {
-                let (total, scroll, viewport_rows) = {
-                    let Some(display) = self.element_by_id(id) else {
+                let total = {
+                    let Some(target) = self.element_by_id(id) else {
                         return false;
                     };
-                    let width = display.width.max(1);
-                    let total = text_wrap::wrapped_line_count(&display.text, width);
-                    let scroll = display.scroll;
-                    let (max_y, max_x) = self.win.get_max_yx();
-                    let height = match display.height_mode {
-                        super::types::ElementHeightMode::Fixed(height) => height.max(1),
-                        super::types::ElementHeightMode::FitContent => 1,
-                    };
-                    let (_, viewport_h) = terminal_bounds::clip_rect(
-                        display.location.x as i32,
-                        self.scrolled_y(display.location.y as i32),
-                        width as i32,
-                        height as i32,
-                        max_x,
-                        max_y,
-                    );
-                    (total, scroll, viewport_h.max(1) as usize)
+                    let width = target.width.max(1);
+                    text_wrap::display_row_count(&target.text, width)
                 };
-                let Some(display) = self.element_mut_by_id(id) else {
+                let Some(target) = self.element_mut_by_id(id) else {
                     return false;
                 };
-                display.scroll = scroll_view::scroll_line_down(scroll, total, viewport_rows);
+                target.scroll = scroll_view::scroll_line_down(target.scroll, total, viewport_rows);
                 true
             }
             _ => false,
@@ -183,8 +165,10 @@ impl RuntimeUi {
             _ => return false,
         };
 
-        self.apply_text_input_state(id, next_state);
-        self.handle_text_input_redraw_after_edit(id, &before_text);
+        if let Some(state) = next_state {
+            self.set_text_input_state(id, state);
+            self.handle_text_input_redraw_after_edit(id, &before_text);
+        }
         true
     }
 

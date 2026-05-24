@@ -47,23 +47,17 @@ impl RuntimeUi {
 
     fn existing_element_screen_rect(&self, id: usize) -> Option<(i32, i32, i32, i32)> {
         let element = self.elements.get(id)?;
-        let (location, width, height) = if element.text_input.is_some() {
-            let width = element.width.max(1);
-            let height = render_height_for_text_input_text(&element.text, width);
-            (element.location, width, height)
-        } else if let ElementHeightMode::Fixed(height) = element.height_mode {
-            (
-                element.location,
-                element.width.max(1),
-                render_height_for_text_display(height),
-            )
+        let width = element.width.max(1);
+        let height = if element.is_button() {
+            render_height_for_button()
+        } else if let Some(fixed) = element.fixed_viewport_height() {
+            render_height_for_text_display(fixed)
+        } else if element.text_input.is_some() || element.is_fit_static_display() {
+            render_height_for_text_input_text(&element.text, width)
         } else {
-            (
-                element.location,
-                element.width.max(1),
-                render_height_for_button(),
-            )
+            render_height_for_button()
         };
+        let (location, width, height) = (element.location, width, height);
 
         let x = location.x as i32;
         let y = self.scrolled_y(location.y as i32);

@@ -209,8 +209,12 @@ impl RuntimeUi {
         };
         if element.text_input.is_some() {
             self.draw_text_input(id);
+        } else if element.is_button() {
+            self.draw_button(id);
         } else if matches!(element.height_mode, ElementHeightMode::Fixed(_)) {
             self.draw_text_display(id);
+        } else if element.is_fit_static_display() {
+            self.draw_wrapped_static_text(id);
         } else {
             self.draw_button(id);
         }
@@ -280,47 +284,58 @@ impl RuntimeUi {
     }
 
     fn draw_text_input(&mut self, id: usize) {
-        let (location, width, text, cursor, selection_anchor, style) = match self.elements.get(id) {
-            Some(element) => {
-                let Some(input) = element.text_input.as_ref() else {
-                    return;
-                };
-                let style = if input.locked {
-                    if element.focused {
-                        input.style.focused_locked
+        let (location, width, text, scroll, viewport_rows, cursor, selection_anchor, style) =
+            match self.elements.get(id) {
+                Some(element) => {
+                    let Some(input) = element.text_input.as_ref() else {
+                        return;
+                    };
+                    let style = if input.locked {
+                        if element.focused {
+                            input.style.focused_locked
+                        } else {
+                            input.style.unfocused_locked
+                        }
+                    } else if element.focused {
+                        input.style.focused_unlocked
                     } else {
-                        input.style.unfocused_locked
-                    }
-                } else if element.focused {
-                    input.style.focused_unlocked
-                } else {
-                    input.style.unfocused_unlocked
-                };
-                (
-                    element.location,
-                    element.width.max(1),
-                    element.text.clone(),
-                    input.cursor,
-                    input.selection_anchor,
-                    (style, input.style.selection),
-                )
-            }
-            _ => return,
-        };
+                        input.style.unfocused_unlocked
+                    };
+                    let viewport_rows = element
+                        .fixed_viewport_height()
+                        .map(|h| h as i32)
+                        .unwrap_or_else(|| {
+                            text_wrap::display_row_count(&element.text, element.width.max(1)) as i32
+                        });
+                    (
+                        element.location,
+                        element.width.max(1),
+                        element.text.clone(),
+                        element.scroll,
+                        viewport_rows,
+                        input.cursor,
+                        input.selection_anchor,
+                        (style, input.style.selection),
+                    )
+                }
+                _ => return,
+            };
 
         let base_pair = self.color_pair(style.0.fg, style.0.bg);
         let selection_pair = self.color_pair(style.1.fg, style.1.bg);
         let (max_y, max_x) = self.win.get_max_yx();
         let x = location.x as i32;
         let y = self.scrolled_y(location.y as i32);
-        let lines = text_wrap::wrapped_lines(&text, width);
-        let logical_rows = text_wrap::display_row_count(&text, width) as i32;
-        let draw_w = terminal_bounds::clip_rect(x, y, width as i32, 1, max_x, max_y).0;
-        if draw_w <= 0 || logical_rows <= 0 {
+        let lines = text_wrap::wrapped_lines_for_display(&text, width);
+        let total_lines = lines.len();
+        let (draw_w, draw_h) =
+            terminal_bounds::clip_rect(x, y, width as i32, viewport_rows, max_x, max_y);
+        if draw_w <= 0 || draw_h <= 0 {
             return;
         }
+        let draw_rows = draw_h as usize;
 
-        self.fill_solid_rows(y, x, draw_w, logical_rows, base_pair, true);
+        self.fill_solid(y, x, draw_w, draw_h, base_pair);
 
         let state = TextInputState {
             text: text.clone(),
@@ -330,12 +345,11 @@ impl RuntimeUi {
         let selection = text_input::selection_range(&state);
         let highlight_cells = text_wrap::selection_highlight_cells(&text, selection, width);
 
-        let visible_lines = terminal_bounds::visible_element_line_range(y, logical_rows, max_y);
-        let visible_start = visible_lines.start;
-        let visible_end = visible_lines.end;
-        for line_idx in visible_lines {
-            let line_idx = line_idx as usize;
-            let row_y = y + line_idx as i32;
+        let offset = scroll_view::clamp_scroll_offset(scroll, total_lines, draw_rows);
+        let range = scroll_view::visible_line_range(offset, draw_rows, total_lines);
+        for (row, line_idx) in range.enumerate() {
+            let line_idx = line_idx;
+            let row_y = y + row as i32;
             if self.is_message_gutter_screen_row(row_y) {
                 continue;
             }
@@ -375,11 +389,10 @@ impl RuntimeUi {
         }
 
         for (line_idx, col) in highlight_cells {
-            let line_idx = line_idx as i32;
-            if line_idx < visible_start || line_idx >= visible_end {
+            if line_idx < offset || line_idx >= offset + draw_rows {
                 continue;
             }
-            let row_y = y + line_idx;
+            let row_y = y + (line_idx - offset) as i32;
             if self.is_message_gutter_screen_row(row_y) {
                 continue;
             }
@@ -405,6 +418,62 @@ impl RuntimeUi {
             self.win.addch(' ');
             self.win.attroff(COLOR_PAIR(selection_pair as u64));
         }
+    }
+
+    fn draw_wrapped_static_text(&mut self, id: usize) {
+        let (location, width, text, style) = match self.elements.get(id) {
+            Some(element) => {
+                let style = if element.focused {
+                    element.style.focused
+                } else {
+                    element.style.unfocused
+                };
+                (
+                    element.location,
+                    element.width.max(1),
+                    element.text.clone(),
+                    style,
+                )
+            }
+            _ => return,
+        };
+
+        let (max_y, max_x) = self.win.get_max_yx();
+        let x = location.x as i32;
+        let y = self.scrolled_y(location.y as i32);
+        let lines = text_wrap::wrapped_lines(&text, width);
+        let logical_rows = lines.len().max(1) as i32;
+        let draw_w = terminal_bounds::clip_rect(x, y, width as i32, logical_rows, max_x, max_y).0;
+        if draw_w <= 0 {
+            return;
+        }
+
+        let pair = self.color_pair(style.fg, style.bg);
+        self.fill_solid_rows(y, x, draw_w, logical_rows, pair, true);
+
+        self.win.attron(COLOR_PAIR(pair as u64));
+        for (line_idx, line) in lines.iter().enumerate() {
+            let row_y = y + line_idx as i32;
+            if !terminal_bounds::row_is_visible(row_y, max_y)
+                || self.is_message_gutter_screen_row(row_y)
+            {
+                continue;
+            }
+            let row_cols = self.max_element_row_cols_respecting_message_gutter(
+                x,
+                max_x,
+                row_y,
+                max_y,
+                width as i32,
+            ) as usize;
+            if row_cols == 0 {
+                continue;
+            }
+            self.win.mv(row_y, x);
+            let clipped = terminal_bounds::clip_str_to_cols(line, row_cols);
+            self.win.addstr(&clipped);
+        }
+        self.win.attroff(COLOR_PAIR(pair as u64));
     }
 
     fn draw_text_display(&mut self, id: usize) {
@@ -553,10 +622,18 @@ impl RuntimeUi {
 
         let width = input.width.max(1);
         let (line, col) = text_wrap::cursor_display_position(&input.text, text_input.cursor, width);
+        let scroll = input.scroll;
+        let viewport_rows = input
+            .fixed_viewport_height()
+            .unwrap_or_else(|| text_wrap::display_row_count(&input.text, width));
         let (max_y, max_x) = self.win.get_max_yx();
         let x = input.location.x as i32;
         let y = self.scrolled_y(input.location.y as i32);
-        let row_y = y + line as i32;
+        if line < scroll || line >= scroll + viewport_rows {
+            let _ = curs_set(0);
+            return;
+        }
+        let row_y = y + (line - scroll) as i32;
         if !terminal_bounds::row_is_visible(row_y, max_y)
             || self.is_message_gutter_screen_row(row_y)
         {

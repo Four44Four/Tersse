@@ -14,12 +14,6 @@ impl RuntimeUi {
             })
     }
 
-    pub(super) fn apply_text_input_state(&mut self, id: ElementId, state: Option<TextInputState>) {
-        if let Some(state) = state {
-            self.set_text_input_state(id, state);
-        }
-    }
-
     pub(super) fn apply_text_input_paste(&mut self, id: ElementId, state: TextInputState) {
         self.set_text_input_state(id, state);
     }

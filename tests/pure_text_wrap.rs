@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 use tersse::pure::text_wrap::{
     cursor_display_position, display_row_count, selection_highlight_cells, wrapped_line_count,
-    wrapped_lines,
+    wrapped_lines, wrapped_lines_for_display,
 };
 
 #[test]
@@ -19,6 +19,16 @@ fn cursor_after_wrap() {
 fn empty_display_rows() {
     assert_eq!(display_row_count("", 48), 1);
     assert_eq!(display_row_count("hello", 48), 1);
+}
+
+#[test]
+fn wrapped_lines_for_display_includes_blank_row_when_empty() {
+    assert_eq!(wrapped_lines("", 10).len(), 0);
+    assert_eq!(wrapped_lines_for_display("", 10), vec![String::new()]);
+    assert_eq!(
+        wrapped_lines_for_display("", 10).len(),
+        display_row_count("", 10)
+    );
 }
 
 #[test]
