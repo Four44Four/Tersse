@@ -18,11 +18,13 @@ mod resize;
 mod screen_scroll;
 mod text_input_state;
 mod types;
+mod ui_session;
 
 pub use types::{
     ButtonConfig, ButtonHandler, ElementConfig, FocusStyle, Style, TextDisplayConfig,
     TextInputConfig, TextInputStyle,
 };
+pub use ui_session::UiSession;
 
 use element_store::ElementStore;
 
@@ -74,4 +76,5 @@ pub struct RuntimeUi {
     resize_debounce_until: Option<Instant>,
     last_terminal_yx: Option<(i32, i32)>,
     screen_scroll: usize,
+    ui_queue: ui_session::UiQueue,
 }

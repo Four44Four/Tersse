@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use std::time::Duration;
 
 use pancurses::{curs_set, endwin, initscr, noecho};
@@ -9,6 +10,7 @@ use crate::ScreenTitle;
 
 use super::element_store::ElementStore;
 use super::types::UiEvent;
+use super::ui_session::{self, UiSession};
 use super::RuntimeUi;
 
 impl RuntimeUi {
@@ -19,6 +21,8 @@ impl RuntimeUi {
         let _ = curs_set(0);
         pancurses::start_color();
         pancurses::use_default_colors();
+
+        let ui_queue = ui_session::new_ui_queue();
 
         let mut ui = Self {
             win,
@@ -33,6 +37,7 @@ impl RuntimeUi {
             resize_debounce_until: None,
             last_terminal_yx: None,
             screen_scroll: 0,
+            ui_queue,
         };
         let _ = ui.reload_screen_after_resize();
         ui
@@ -46,9 +51,14 @@ impl RuntimeUi {
         self.title = None;
     }
 
+    /// Returns a cloneable handle for queueing UI updates from other threads.
+    pub fn ui_session(&self) -> UiSession {
+        UiSession::new(Arc::clone(&self.ui_queue))
+    }
+
     /// Runs the UI event loop until the user quits.
     pub fn run(&mut self) {
-        while self.step() {}
+        while self.run_frame() {}
     }
 
     /// Advances one frame. Returns `false` when the user quits.
@@ -57,10 +67,17 @@ impl RuntimeUi {
     }
 
     fn run_frame(&mut self) -> bool {
-        let quit = matches!(
-            self.poll_event(Duration::from_millis(POLL_TIMEOUT_MS)),
-            UiEvent::Quit
-        );
+        self.drain_ui_queue();
+
+        let timeout = if self.ui_queue_has_pending() {
+            Duration::ZERO
+        } else {
+            Duration::from_millis(POLL_TIMEOUT_MS)
+        };
+
+        let quit = matches!(self.poll_event(timeout), UiEvent::Quit);
+        self.drain_ui_queue();
+
         let _ = self.tick_resize_debounce();
         if !self.is_resize_debounce_active() {
             self.draw();

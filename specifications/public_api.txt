@@ -1,3 +1,6 @@
  - Only expose UI element creation, deletion, property modification (text display, color, position, size), focus number changing, focused element changing, lock status, etc...
  - Do not expose any internal constants, keyboard processing/input logic, ID allocation logic, and other mechanisms that are not directly relevant to UI flow
     - Keep clipboard API exposed
+ - Expose a function to queue a another function/closure to run synchronously in the context of the UI thread
+    - The running of that inputted function/closure will trigger a UI update immediately after it concludes running
+    - This API function should be safely callable from any thread or async environment to trigger a UI update asynchrously or concurrently without causing race conditions within UI

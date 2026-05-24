@@ -1,11 +1,13 @@
-mod flash;
 mod style;
 
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::Arc;
 use std::time::Duration;
 
-use tokio::task::AbortHandle;
+use tokio::runtime::Runtime;
+use tokio::task::JoinHandle;
+use tokio::time::sleep;
 use tersse::prelude::*;
 
 use style::{button_style, locked_like_style, screen_title, text_input_style};
@@ -28,8 +30,8 @@ struct App {
     result_id: Option<ElementId>,
     foo_text_id: Option<ElementId>,
     bar_text_id: Option<ElementId>,
-    foo_flash: Option<AbortHandle>,
-    bar_flash: Option<AbortHandle>,
+    foo_flash: Option<JoinHandle<()>>,
+    bar_flash: Option<JoinHandle<()>>,
     result_visible: bool,
 }
 
@@ -50,35 +52,31 @@ impl App {
         }
     }
 
-    fn handle_foo(
-        &mut self,
-        ui: &mut RuntimeUi,
-        ui_cell: &Rc<RefCell<RuntimeUi>>,
-        app: &Rc<RefCell<Option<App>>>,
-    ) {
+    fn handle_foo(&mut self, ui: &mut RuntimeUi, rt: &Runtime, session: &UiSession) {
+        self.foo_flash.take().inspect(|task| task.abort());
         let id = self.upsert_flash_display(ui, self.foo_id, self.foo_text_id, 0.5, "Button 1");
         self.foo_text_id = Some(id);
-        flash::arm(ui_cell, &mut self.foo_flash, id, FLASH_FOO, {
-            let app = Rc::clone(app);
-            move || app.borrow_mut().as_mut().unwrap().foo_text_id = None
-        });
+        self.foo_flash = Some(schedule_flash_removal(
+            rt,
+            session.clone(),
+            id,
+            FLASH_FOO,
+        ));
     }
 
-    fn handle_bar(
-        &mut self,
-        ui: &mut RuntimeUi,
-        ui_cell: &Rc<RefCell<RuntimeUi>>,
-        app: &Rc<RefCell<Option<App>>>,
-    ) {
+    fn handle_bar(&mut self, ui: &mut RuntimeUi, rt: &Runtime, session: &UiSession) {
+        self.bar_flash.take().inspect(|task| task.abort());
         let id = self.upsert_flash_display(ui, self.bar_id, self.bar_text_id, 1.5, "Button 2");
         self.bar_text_id = Some(id);
-        flash::arm(ui_cell, &mut self.bar_flash, id, FLASH_BAR, {
-            let app = Rc::clone(app);
-            move || app.borrow_mut().as_mut().unwrap().bar_text_id = None
-        });
+        self.bar_flash = Some(schedule_flash_removal(
+            rt,
+            session.clone(),
+            id,
+            FLASH_BAR,
+        ));
     }
 
-    fn handle_press(&mut self, ui: &mut RuntimeUi, app_state: Rc<RefCell<Option<App>>>) {
+    fn handle_press(&mut self, ui: &mut RuntimeUi, app: Rc<RefCell<Option<App>>>) {
         let input = ui.read_text_input(self.input_id).unwrap_or_default();
         let result = build_result_text(&input);
         let _ = ui.set_text_input_lock_status(self.input_id, true);
@@ -100,11 +98,7 @@ impl App {
                 focus_number: 4.0,
                 style: button_style(),
                 on_press: Box::new(move |ui| {
-                    app_state
-                        .borrow_mut()
-                        .as_mut()
-                        .unwrap()
-                        .handle_clear(ui);
+                    app.borrow_mut().as_mut().unwrap().handle_clear(ui);
                 }),
             }));
         }
@@ -150,111 +144,122 @@ impl App {
         text: &str,
     ) -> ElementId {
         let width = text.chars().count().max(1);
-        let config = TextDisplayConfig {
-            placement: ElementPlacement::relative_to(
-                button_id,
-                ParentSide::Bottom,
-                Location::default(),
-            ),
+        let placement = ElementPlacement::relative_to(
+            button_id,
+            ParentSide::Bottom,
+            Location::default(),
+        );
+        if let Some(id) = display_id {
+            let config = TextDisplayConfig {
+                placement: placement.clone(),
+                width,
+                height: 1,
+                focus_number,
+                style: locked_like_style(),
+                initial_text: text.to_string(),
+            };
+            if ui.update_text_display(id, config) {
+                return id;
+            }
+        }
+        ui.create_text_display(TextDisplayConfig {
+            placement,
             width,
             height: 1,
             focus_number,
             style: locked_like_style(),
             initial_text: text.to_string(),
-        };
-        if let Some(id) = display_id {
-            let _ = ui.update_text_display(id, config);
-            id
-        } else {
-            ui.create_text_display(config)
-        }
+        })
     }
 }
 
-#[tokio::main(flavor = "current_thread")]
-async fn main() {
-    tokio::task::LocalSet::new()
-        .run_until(async {
-            let ui_cell = Rc::new(RefCell::new(RuntimeUi::new()));
-            let app: Rc<RefCell<Option<App>>> = Rc::new(RefCell::new(None));
+fn schedule_flash_removal(
+    rt: &Runtime,
+    session: UiSession,
+    id: ElementId,
+    after: Duration,
+) -> JoinHandle<()> {
+    rt.spawn(async move {
+        sleep(after).await;
+        session.queue_update(move |ui| {
+            let _ = ui.remove_and_reflow(id);
+        });
+    })
+}
 
-            let (foo_id, bar_id, input_id, press_id) = {
-                let mut ui = ui_cell.borrow_mut();
-                ui.set_title(screen_title());
+fn main() {
+    let rt = Arc::new(Runtime::new().expect("Failed to create Tokio runtime"));
+    let mut ui = RuntimeUi::new();
+    let session = ui.ui_session();
+    let app: Rc<RefCell<Option<App>>> = Rc::new(RefCell::new(None));
 
-                let foo_app = Rc::clone(&app);
-                let foo_ui = Rc::clone(&ui_cell);
-                let foo_id = ui.create_button(ButtonConfig {
-                    label: "Foo".to_string(),
-                    width: FOO_BAR_BUTTON_WIDTH,
-                    placement: ElementPlacement::absolute(Location { x: 0, y: 2 }),
-                    focus_number: 0.0,
-                    style: button_style(),
-                    on_press: Box::new(move |ui| {
-                        foo_app
-                            .borrow_mut()
-                            .as_mut()
-                            .unwrap()
-                            .handle_foo(ui, &foo_ui, &foo_app);
-                    }),
-                });
+    ui.set_title(screen_title());
 
-                let bar_app = Rc::clone(&app);
-                let bar_ui = Rc::clone(&ui_cell);
-                let bar_id = ui.create_button(ButtonConfig {
-                    label: "Bar".to_string(),
-                    width: FOO_BAR_BUTTON_WIDTH,
-                    placement: ElementPlacement::absolute(Location { x: 0, y: 3 }),
-                    focus_number: 1.0,
-                    style: button_style(),
-                    on_press: Box::new(move |ui| {
-                        bar_app
-                            .borrow_mut()
-                            .as_mut()
-                            .unwrap()
-                            .handle_bar(ui, &bar_ui, &bar_app);
-                    }),
-                });
+    let foo_app = Rc::clone(&app);
+    let foo_rt = Arc::clone(&rt);
+    let foo_session = session.clone();
+    let foo_id = ui.create_button(ButtonConfig {
+        label: "Foo".to_string(),
+        width: FOO_BAR_BUTTON_WIDTH,
+        placement: ElementPlacement::absolute(Location { x: 0, y: 2 }),
+        focus_number: 0.0,
+        style: button_style(),
+        on_press: Box::new(move |ui| {
+            foo_app
+                .borrow_mut()
+                .as_mut()
+                .unwrap()
+                .handle_foo(ui, &foo_rt, &foo_session);
+        }),
+    });
 
-                let input_id = ui.create_text_input(TextInputConfig {
-                    width: INPUT_WIDTH,
-                    placement: ElementPlacement::absolute(Location { x: 0, y: 4 }),
-                    focus_number: 2.0,
-                    style: text_input_style(),
-                    locked: false,
-                    initial_text: String::new(),
-                });
+    let bar_app = Rc::clone(&app);
+    let bar_rt = Arc::clone(&rt);
+    let bar_session = session.clone();
+    let bar_id = ui.create_button(ButtonConfig {
+        label: "Bar".to_string(),
+        width: FOO_BAR_BUTTON_WIDTH,
+        placement: ElementPlacement::absolute(Location { x: 0, y: 3 }),
+        focus_number: 1.0,
+        style: button_style(),
+        on_press: Box::new(move |ui| {
+            bar_app
+                .borrow_mut()
+                .as_mut()
+                .unwrap()
+                .handle_bar(ui, &bar_rt, &bar_session);
+        }),
+    });
 
-                let press_app = Rc::clone(&app);
-                let press_id = ui.create_button(ButtonConfig {
-                    label: PRESS_LABEL.to_string(),
-                    width: PRESS_LABEL.chars().count().max(1),
-                    placement: ElementPlacement::relative_to(
-                        input_id,
-                        ParentSide::Bottom,
-                        Location::default(),
-                    ),
-                    focus_number: 3.0,
-                    style: button_style(),
-                    on_press: Box::new(move |ui| {
-                        press_app
-                            .borrow_mut()
-                            .as_mut()
-                            .unwrap()
-                            .handle_press(ui, Rc::clone(&press_app));
-                    }),
-                });
+    let input_id = ui.create_text_input(TextInputConfig {
+        width: INPUT_WIDTH,
+        placement: ElementPlacement::absolute(Location { x: 0, y: 4 }),
+        focus_number: 2.0,
+        style: text_input_style(),
+        locked: false,
+        initial_text: String::new(),
+    });
 
-                (foo_id, bar_id, input_id, press_id)
-            };
+    let press_app = Rc::clone(&app);
+    let press_id = ui.create_button(ButtonConfig {
+        label: PRESS_LABEL.to_string(),
+        width: PRESS_LABEL.chars().count().max(1),
+        placement: ElementPlacement::relative_to(input_id, ParentSide::Bottom, Location::default()),
+        focus_number: 3.0,
+        style: button_style(),
+        on_press: Box::new(move |ui| {
+            press_app
+                .borrow_mut()
+                .as_mut()
+                .unwrap()
+                .handle_press(ui, Rc::clone(&press_app));
+        }),
+    });
 
-            *app.borrow_mut() = Some(App::new(foo_id, bar_id, input_id, press_id));
+    app.borrow_mut()
+        .replace(App::new(foo_id, bar_id, input_id, press_id));
 
-            while ui_cell.borrow_mut().step() {
-                tokio::task::yield_now().await;
-            }
-        })
-        .await;
+    ui.run();
 }
 
 fn build_result_text(input: &str) -> String {
