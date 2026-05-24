@@ -1,3 +1,7 @@
+use std::time::{Duration, Instant};
+
+use crate::constants::UI_REDRAW_DEBOUNCE_MS;
+use crate::pure::resize_debounce;
 use crate::pure::scroll_view;
 use crate::pure::terminal_bounds;
 use crate::pure::text_input::{self, TextInputState};
@@ -9,6 +13,48 @@ use super::types::RuntimeElement;
 use super::RuntimeUi;
 
 impl RuntimeUi {
+    pub(super) fn request_draw(&mut self) {
+        self.redraw_debounce_until = Some(resize_debounce::debounce_deadline(
+            Instant::now(),
+            Duration::from_millis(UI_REDRAW_DEBOUNCE_MS),
+        ));
+    }
+
+    /// Applies a debounced UI redraw. Returns true when the screen was redrawn.
+    pub(super) fn tick_redraw_debounce(&mut self) -> bool {
+        let Some(until) = self.redraw_debounce_until else {
+            return false;
+        };
+        if !resize_debounce::debounce_has_elapsed(until, Instant::now()) {
+            return false;
+        }
+        self.redraw_debounce_until = None;
+        self.draw();
+        true
+    }
+
+    pub(super) fn next_debounce_deadline(&self) -> Option<Instant> {
+        match (self.resize_debounce_until, self.redraw_debounce_until) {
+            (Some(resize), Some(redraw)) => Some(resize.min(redraw)),
+            (Some(resize), None) => Some(resize),
+            (None, Some(redraw)) => Some(redraw),
+            (None, None) => None,
+        }
+    }
+
+    pub(super) fn flush_pending_redraw(&mut self) {
+        let resize_changed = self.tick_resize_debounce();
+        if self.is_resize_debounce_active() {
+            return;
+        }
+        if resize_changed {
+            self.redraw_debounce_until = None;
+            self.draw();
+            return;
+        }
+        let _ = self.tick_redraw_debounce();
+    }
+
     pub fn draw(&mut self) {
         self.auto_reflow_for_dynamic_heights();
         self.clamp_screen_scroll_offset();

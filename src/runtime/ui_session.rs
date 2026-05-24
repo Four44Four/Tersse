@@ -38,8 +38,8 @@ impl UiSession {
 
     /// Queues `work` to run on the UI thread during the next event-loop frame.
     ///
-    /// The UI is redrawn immediately after `work` finishes. This method is safe
-    /// to call from any thread or async runtime.
+    /// The UI is redrawn after `work` finishes, respecting the UI redraw debounce
+    /// interval. This method is safe to call from any thread or async runtime.
     pub fn queue_update(&self, work: impl FnOnce(&mut RuntimeUi) + Send + 'static) {
         self.queue.lock().unwrap().push(Box::new(work));
         let _ = self.signal_tx.send(UiSignal::QueueUpdated);
@@ -59,9 +59,7 @@ impl RuntimeUi {
         for work in works {
             work(self);
             let _ = self.tick_resize_debounce();
-            if !self.is_resize_debounce_active() {
-                self.draw();
-            }
+            self.request_draw();
         }
     }
 

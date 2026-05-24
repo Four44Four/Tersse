@@ -38,6 +38,7 @@ impl RuntimeUi {
             cached_heights: std::collections::HashMap::new(),
             text_input_layout_cache: std::collections::HashMap::new(),
             resize_debounce_until: None,
+            redraw_debounce_until: None,
             last_terminal_yx: None,
             screen_scroll: 0,
             ui_queue,
@@ -94,7 +95,7 @@ impl RuntimeUi {
     }
 
     fn wait_for_signal(&self) -> Option<ui_session::UiSignal> {
-        if let Some(until) = self.resize_debounce_until {
+        if let Some(until) = self.next_debounce_deadline() {
             let now = Instant::now();
             if now >= until {
                 return Some(ui_session::UiSignal::QueueUpdated);
@@ -110,10 +111,7 @@ impl RuntimeUi {
         match signal {
             ui_session::UiSignal::QueueUpdated => {
                 self.drain_ui_queue();
-                let _ = self.tick_resize_debounce();
-                if !self.is_resize_debounce_active() {
-                    self.draw();
-                }
+                self.flush_pending_redraw();
                 UiEvent::None
             }
             ui_session::UiSignal::Terminal(event) => self.handle_terminal_poll(event),
@@ -134,10 +132,8 @@ impl RuntimeUi {
             TerminalPoll::Key(key) => self.handle_key(key),
         };
         self.drain_ui_queue();
-        let _ = self.tick_resize_debounce();
-        if !self.is_resize_debounce_active() {
-            self.draw();
-        }
+        self.request_draw();
+        self.flush_pending_redraw();
         ui_event
     }
 

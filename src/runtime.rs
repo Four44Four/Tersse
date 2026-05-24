@@ -74,6 +74,7 @@ pub struct RuntimeUi {
     cached_heights: HashMap<usize, usize>,
     text_input_layout_cache: HashMap<usize, TextInputLayoutCache>,
     resize_debounce_until: Option<Instant>,
+    redraw_debounce_until: Option<Instant>,
     last_terminal_yx: Option<(i32, i32)>,
     screen_scroll: usize,
     ui_queue: ui_session::UiQueue,
