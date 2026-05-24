@@ -74,6 +74,9 @@ impl RuntimeUi {
 
         self.draw_cursor_for_active_text_input();
         self.win.refresh();
+        // A full-screen draw supersedes any incremental queue redraw plan (e.g. marks
+        // accumulated while creating elements before the first frame).
+        self.clear_pending_queue_redraw();
     }
 
     pub(super) fn mark_element_only_changed(&mut self, id: ElementId) {
