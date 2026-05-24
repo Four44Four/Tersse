@@ -150,9 +150,7 @@ impl RuntimeUi {
                     return ui_event;
                 }
                 let current = self.current_focused_id();
-                if full_immediate {
-                    self.draw();
-                } else {
+                if !full_immediate {
                     self.redraw_keyboard_focused_elements(previous, current);
                 }
                 self.finish_terminal_input_redraw(full_immediate);
