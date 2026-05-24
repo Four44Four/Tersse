@@ -77,4 +77,9 @@ pub struct RuntimeUi {
     last_terminal_yx: Option<(i32, i32)>,
     screen_scroll: usize,
     ui_queue: ui_session::UiQueue,
+    ui_signal_tx: ui_session::UiSignalSender,
+    ui_signal_rx: ui_session::UiSignalReceiver,
+    keyboard_runtime: Option<tokio::runtime::Runtime>,
+    keyboard_task: Option<tokio::task::JoinHandle<()>>,
+    has_rendered_first_frame: bool,
 }

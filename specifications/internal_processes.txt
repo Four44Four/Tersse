@@ -1,0 +1,9 @@
+ - There is a UI refresh debounce constant
+ - There is an internal queue of tasks that can be scheduled by a user externally from asychronous or concurrent contexts safely
+    - This queue will be activated when any tasks are inserted to run the first tasks synchronously on the thread context of the UI until there are no more tasks
+    - Tasks inserted into this queue by any means can safely modify the UI without triggering race conditions
+    - UI should be refreshed after execution of each task, respecting the UI debounce constant
+ - Keyboard input across all elements should be received asynchronously and non-blockingly and not consume CPU cycles while user is idle (no use of continuous polling for input events)
+    - UI should be refreshed when keyboard input is asynchronously received, respecting the UI debounce constant
+ - When UI is idle and user is idle:
+    - There should be no UI refreshes performed, and minimal or no CPU cycles should be consumed by any background loop

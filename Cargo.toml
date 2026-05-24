@@ -9,16 +9,16 @@ build = "build.rs"
 [features]
 default = ["pure-tests"]
 pure-tests = []
-basic-example = ["dep:tokio"]
 
 [dependencies]
 arboard = "3"
-crossterm = "0.28"
+crossterm = { version = "0.28", features = ["event-stream"] }
 dotenvy = "0.15"
 reqwest = { version = "0.12", features = ["blocking", "json", "stream"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-tokio = { version = "1", features = ["rt", "rt-multi-thread", "sync", "time"], optional = true }
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "sync", "time"] }
+futures-util = "0.3"
 
 [target.'cfg(windows)'.dependencies]
 # win32 = existing console; default win32a opens a separate GDI window
@@ -34,4 +34,3 @@ strip = true
 [[bin]]
 name = "basic_example"
 path = "example/basic/main.rs"
-required-features = ["basic-example"]

@@ -1,9 +1,8 @@
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use pancurses::{curs_set, endwin, initscr, noecho};
 
-use crate::constants::POLL_TIMEOUT_MS;
 use crate::terminal_input;
 use crate::terminal_input::{TerminalKey, TerminalPoll};
 use crate::ScreenTitle;
@@ -23,6 +22,10 @@ impl RuntimeUi {
         pancurses::use_default_colors();
 
         let ui_queue = ui_session::new_ui_queue();
+        let (ui_signal_tx, ui_signal_rx) = ui_session::new_ui_signal_channel();
+        let keyboard_runtime =
+            tokio::runtime::Runtime::new().expect("Failed to create keyboard runtime");
+        let keyboard_task = Some(spawn_keyboard_task(&keyboard_runtime, ui_signal_tx.clone()));
 
         let mut ui = Self {
             win,
@@ -38,6 +41,11 @@ impl RuntimeUi {
             last_terminal_yx: None,
             screen_scroll: 0,
             ui_queue,
+            ui_signal_tx,
+            ui_signal_rx,
+            keyboard_runtime: Some(keyboard_runtime),
+            keyboard_task,
+            has_rendered_first_frame: false,
         };
         let _ = ui.reload_screen_after_resize();
         ui
@@ -53,7 +61,7 @@ impl RuntimeUi {
 
     /// Returns a cloneable handle for queueing UI updates from other threads.
     pub fn ui_session(&self) -> UiSession {
-        UiSession::new(Arc::clone(&self.ui_queue))
+        UiSession::new(Arc::clone(&self.ui_queue), self.ui_signal_tx.clone())
     }
 
     /// Runs the UI event loop until the user quits.
@@ -67,38 +75,70 @@ impl RuntimeUi {
     }
 
     fn run_frame(&mut self) -> bool {
-        self.drain_ui_queue();
+        if !self.has_rendered_first_frame {
+            let _ = self.tick_resize_debounce();
+            if !self.is_resize_debounce_active() {
+                self.draw();
+            }
+            self.has_rendered_first_frame = true;
+        }
 
-        let timeout = if self.ui_queue_has_pending() {
-            Duration::ZERO
+        let quit = if self.ui_queue_has_pending() {
+            matches!(self.process_signal(ui_session::UiSignal::QueueUpdated), UiEvent::Quit)
+        } else if let Some(signal) = self.wait_for_signal() {
+            matches!(self.process_signal(signal), UiEvent::Quit)
         } else {
-            Duration::from_millis(POLL_TIMEOUT_MS)
+            matches!(self.process_signal(ui_session::UiSignal::QueueUpdated), UiEvent::Quit)
         };
+        !quit
+    }
 
-        let quit = matches!(self.poll_event(timeout), UiEvent::Quit);
+    fn wait_for_signal(&self) -> Option<ui_session::UiSignal> {
+        if let Some(until) = self.resize_debounce_until {
+            let now = Instant::now();
+            if now >= until {
+                return Some(ui_session::UiSignal::QueueUpdated);
+            }
+            let timeout = until.saturating_duration_since(now);
+            self.ui_signal_rx.recv_timeout(timeout).ok()
+        } else {
+            self.ui_signal_rx.recv().ok()
+        }
+    }
+
+    fn process_signal(&mut self, signal: ui_session::UiSignal) -> UiEvent {
+        match signal {
+            ui_session::UiSignal::QueueUpdated => {
+                self.drain_ui_queue();
+                let _ = self.tick_resize_debounce();
+                if !self.is_resize_debounce_active() {
+                    self.draw();
+                }
+                UiEvent::None
+            }
+            ui_session::UiSignal::Terminal(event) => self.handle_terminal_poll(event),
+            ui_session::UiSignal::TerminalError => UiEvent::Quit,
+        }
+    }
+
+    fn handle_terminal_poll(&mut self, event: TerminalPoll) -> UiEvent {
+        let ui_event = match event {
+            TerminalPoll::Resized { .. } => {
+                self.note_terminal_resize();
+                UiEvent::None
+            }
+            TerminalPoll::Paste(paste) => {
+                let _ = self.handle_text_input_paste(&paste);
+                UiEvent::None
+            }
+            TerminalPoll::Key(key) => self.handle_key(key),
+        };
         self.drain_ui_queue();
-
         let _ = self.tick_resize_debounce();
         if !self.is_resize_debounce_active() {
             self.draw();
         }
-        !quit
-    }
-
-    fn poll_event(&mut self, timeout: Duration) -> UiEvent {
-        match terminal_input::poll_terminal(timeout) {
-            Ok(Some(TerminalPoll::Resized { .. })) => {
-                self.note_terminal_resize();
-                UiEvent::None
-            }
-            Ok(Some(TerminalPoll::Paste(paste))) => {
-                let _ = self.handle_text_input_paste(&paste);
-                UiEvent::None
-            }
-            Ok(Some(TerminalPoll::Key(key))) => self.handle_key(key),
-            Ok(None) => UiEvent::None,
-            Err(_) => UiEvent::Quit,
-        }
+        ui_event
     }
 
     fn handle_key(&mut self, key: TerminalKey) -> UiEvent {
@@ -132,8 +172,37 @@ impl RuntimeUi {
 
 impl Drop for RuntimeUi {
     fn drop(&mut self) {
+        if let Some(task) = self.keyboard_task.take() {
+            task.abort();
+        }
+        if let Some(runtime) = self.keyboard_runtime.take() {
+            runtime.shutdown_timeout(Duration::from_millis(50));
+        }
         let _ = curs_set(1);
         endwin();
         let _ = terminal_input::leave_raw_mode();
     }
+}
+
+fn spawn_keyboard_task(
+    runtime: &tokio::runtime::Runtime,
+    signal_tx: ui_session::UiSignalSender,
+) -> tokio::task::JoinHandle<()> {
+    runtime.spawn(async move {
+        let mut stream = terminal_input::terminal_event_stream();
+        loop {
+            match terminal_input::read_terminal_event(&mut stream).await {
+                Ok(Some(event)) => {
+                    if signal_tx.send(ui_session::UiSignal::Terminal(event)).is_err() {
+                        break;
+                    }
+                }
+                Ok(None) => break,
+                Err(_) => {
+                    let _ = signal_tx.send(ui_session::UiSignal::TerminalError);
+                    break;
+                }
+            }
+        }
+    })
 }

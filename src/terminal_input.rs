@@ -2,13 +2,14 @@
 
 use crate::pure::keyboard::arrow_extend_selection;
 use crossterm::event::{
-    self, DisableBracketedPaste, EnableBracketedPaste, Event, KeyCode, KeyEvent, KeyEventKind,
+    DisableBracketedPaste, EnableBracketedPaste, Event, EventStream, KeyCode, KeyEvent,
+    KeyEventKind,
     KeyModifiers,
 };
 use crossterm::execute;
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode, size};
+use futures_util::StreamExt;
 use std::io::{self, stdout};
-use std::time::Duration;
 
 /// Normalized key events for the UI loop.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -71,16 +72,22 @@ pub fn terminal_size() -> io::Result<(u16, u16)> {
     size()
 }
 
-/// Poll for a key press or terminal resize. Returns `Ok(None)` on timeout.
-pub fn poll_terminal(timeout: Duration) -> io::Result<Option<TerminalPoll>> {
-    let poll_timeout = timeout;
-    loop {
-        if !event::poll(poll_timeout)? {
-            return Ok(None);
-        }
-        match event::read()? {
+pub fn terminal_event_stream() -> EventStream {
+    EventStream::new()
+}
+
+/// Reads the next mapped terminal event from `EventStream`.
+///
+/// Returns `Ok(None)` when the stream ends.
+pub async fn read_terminal_event(stream: &mut EventStream) -> io::Result<Option<TerminalPoll>> {
+    while let Some(event) = stream.next().await {
+        let event = event.map_err(io::Error::other)?;
+        match event {
             Event::Key(key) => {
-                return Ok(map_key_event(key).map(TerminalPoll::Key));
+                if let Some(key) = map_key_event(key) {
+                    return Ok(Some(TerminalPoll::Key(key)));
+                }
+                continue;
             }
             Event::Paste(paste) => return Ok(Some(TerminalPoll::Paste(paste))),
             Event::Resize(cols, rows) => {
@@ -89,6 +96,7 @@ pub fn poll_terminal(timeout: Duration) -> io::Result<Option<TerminalPoll>> {
             _ => continue,
         }
     }
+    Ok(None)
 }
 
 fn map_key_event(key: KeyEvent) -> Option<TerminalKey> {
