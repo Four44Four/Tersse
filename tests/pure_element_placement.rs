@@ -2,7 +2,7 @@ use tersse::pure::element_placement::{
     default_child_location, descendant_ids, rectangles_overlap, resolve_absolute_location,
     resolve_overlap_location, ElementBounds, ElementPlacement, ParentSide,
 };
-use tersse::{create_text_input_field_element, Element, ElementStore, Location};
+use tersse::{create_text_element, Element, ElementStore, Location};
 
 fn bounds(x: u16, y: u16, width: usize, height: usize) -> ElementBounds {
     ElementBounds {
@@ -14,7 +14,7 @@ fn bounds(x: u16, y: u16, width: usize, height: usize) -> ElementBounds {
 }
 
 fn field() -> Element {
-    Element::TextInputField(create_text_input_field_element(1))
+    create_text_element(1, "")
 }
 
 #[test]
@@ -104,12 +104,9 @@ fn relative_placement_uses_parent_bounds() {
     let mut store = ElementStore::new();
     let parent = store.insert(0.0, field());
     let placement = ElementPlacement::relative_to(parent, ParentSide::Bottom, Location::default());
-    let loc = resolve_absolute_location(
-        &placement,
-        Some(bounds(0, 4, 20, 1)),
-        bounds(0, 0, 80, 12),
-    )
-    .unwrap();
+    let loc =
+        resolve_absolute_location(&placement, Some(bounds(0, 4, 20, 1)), bounds(0, 0, 80, 12))
+            .unwrap();
     assert_eq!(loc, Location { x: 0, y: 5 });
 }
 

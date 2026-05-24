@@ -1,10 +1,10 @@
 use tersse::{
-    create_text_input_field_element, delete_focused_tui_element, delete_tui_element,
-    force_focus_on_element, Element, ElementStore, FocusError,
+    create_text_element, delete_focused_tui_element, delete_tui_element, force_focus_on_element,
+    Element, ElementStore, FocusError,
 };
 
 fn field(width: usize) -> Element {
-    Element::TextInputField(create_text_input_field_element(width))
+    create_text_element(width, "")
 }
 
 #[test]
@@ -24,14 +24,8 @@ fn force_focus_on_element_targets_id() {
     let second = store.insert(1.0, field(5));
 
     force_focus_on_element(&mut store, second).expect("second exists");
-    assert!(matches!(
-        store.get(second).map(|s| &s.element),
-        Some(Element::TextInputField(f)) if f.focused
-    ));
-    assert!(matches!(
-        store.get(first).map(|s| &s.element),
-        Some(Element::TextInputField(f)) if !f.focused
-    ));
+    assert!(store.get(second).is_some_and(|s| s.element.focused));
+    assert!(store.get(first).is_some_and(|s| !s.element.focused));
 }
 
 #[test]
@@ -45,8 +39,7 @@ fn delete_tui_element_and_focused_element_use_ids() {
     assert_eq!(store.len(), 1);
 
     force_focus_on_element(&mut store, keep).expect("keep exists");
-    let focused_removed =
-        delete_focused_tui_element(&mut store).expect("focused element removed");
+    let focused_removed = delete_focused_tui_element(&mut store).expect("focused element removed");
     assert_eq!(focused_removed.id(), keep);
     assert!(store.is_empty());
 }
@@ -79,10 +72,7 @@ fn insert_skips_ids_already_in_use_after_manual_occupancy() {
 }
 
 fn text_input_width(element: &Element) -> Option<usize> {
-    match element {
-        Element::TextInputField(f) => Some(f.width),
-        _ => None,
-    }
+    Some(element.width)
 }
 
 #[test]
@@ -100,7 +90,9 @@ fn overflow_allocation_does_not_overwrite_active_low_id_elements() {
 
     assert_eq!(store.len(), 3);
     assert_eq!(
-        store.get(id0).and_then(|stored| text_input_width(&stored.element)),
+        store
+            .get(id0)
+            .and_then(|stored| text_input_width(&stored.element)),
         Some(11),
         "element at id 0 must remain after counter overflow"
     );

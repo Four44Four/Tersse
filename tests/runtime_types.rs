@@ -1,11 +1,9 @@
-use tersse::{
-    runtime_clamp_text_display_dimensions, runtime_text_input_state_snapshot,
-};
+use tersse::{runtime_clamp_fixed_height, runtime_text_input_state_snapshot};
 
 #[test]
-fn text_display_dimensions_are_clamped_to_minimum_one() {
-    assert_eq!(runtime_clamp_text_display_dimensions(0, 0), (1, 1));
-    assert_eq!(runtime_clamp_text_display_dimensions(20, 4), (20, 4));
+fn fixed_height_is_clamped_to_minimum_one() {
+    assert_eq!(runtime_clamp_fixed_height(0), 1);
+    assert_eq!(runtime_clamp_fixed_height(4), 4);
 }
 
 #[test]

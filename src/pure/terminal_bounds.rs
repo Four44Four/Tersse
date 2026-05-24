@@ -78,8 +78,7 @@ pub fn max_element_row_cols(
     terminal_max_y: i32,
     element_width: i32,
 ) -> i32 {
-    cols_for_printing(x, max_x, row_y, terminal_max_y)
-        .min(element_width.max(0))
+    cols_for_printing(x, max_x, row_y, terminal_max_y).min(element_width.max(0))
 }
 
 /// Truncate `height` so the rectangle ending at `y + height - 1` does not extend past usable height.

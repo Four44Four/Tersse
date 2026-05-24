@@ -7,9 +7,9 @@ use pancurses::{curs_set, endwin, initscr, noecho};
 use tokio::runtime::Handle;
 use tokio::sync::oneshot;
 
+use crate::pure::message_gutter::MessageGutterState;
 use crate::terminal_input;
 use crate::terminal_input::{TerminalKey, TerminalPoll};
-use crate::pure::message_gutter::MessageGutterState;
 use crate::ScreenTitle;
 
 use super::element_store::ElementStore;
@@ -46,9 +46,7 @@ impl AsyncRuntimeDriver {
             })
             .expect("Failed to spawn async driver thread");
 
-        let handle = ready_rx
-            .recv()
-            .expect("async runtime ready signal missing");
+        let handle = ready_rx.recv().expect("async runtime ready signal missing");
         Self {
             handle,
             shutdown_tx: Some(shutdown_tx),
@@ -186,11 +184,17 @@ impl RuntimeUi {
         }
 
         let quit = if self.ui_queue_has_pending() {
-            matches!(self.process_signal(ui_session::UiSignal::QueueUpdated), UiEvent::Quit)
+            matches!(
+                self.process_signal(ui_session::UiSignal::QueueUpdated),
+                UiEvent::Quit
+            )
         } else if let Some(signal) = self.wait_for_signal() {
             matches!(self.process_signal(signal), UiEvent::Quit)
         } else {
-            matches!(self.process_signal(ui_session::UiSignal::QueueUpdated), UiEvent::Quit)
+            matches!(
+                self.process_signal(ui_session::UiSignal::QueueUpdated),
+                UiEvent::Quit
+            )
         };
         !quit
     }
@@ -222,8 +226,7 @@ impl RuntimeUi {
     }
 
     fn handle_terminal_poll(&mut self, event: TerminalPoll) -> UiEvent {
-        let keyboard_input =
-            matches!(&event, TerminalPoll::Paste(_) | TerminalPoll::Key(_));
+        let keyboard_input = matches!(&event, TerminalPoll::Paste(_) | TerminalPoll::Key(_));
         if keyboard_input {
             self.flush_pending_queue_redraw_for_keyboard();
         }

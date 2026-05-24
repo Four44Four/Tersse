@@ -17,9 +17,8 @@ impl RuntimeUi {
     }
 
     pub(super) fn is_resize_debounce_active(&self) -> bool {
-        self.resize_debounce_until.is_some_and(|until| {
-            !resize_debounce::debounce_has_elapsed(until, Instant::now())
-        })
+        self.resize_debounce_until
+            .is_some_and(|until| !resize_debounce::debounce_has_elapsed(until, Instant::now()))
     }
 
     /// Applies a debounced terminal resize. Returns true when the terminal size changed.

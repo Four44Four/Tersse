@@ -1,4 +1,3 @@
- - Has all properties of TUI elements
  - Can navigate to next/previous element using Up and Down arrow keys
  - If text input field is focused and Left/Right arrow keys are pressed:
     - Do not change focused element

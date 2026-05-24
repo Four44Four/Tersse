@@ -72,8 +72,11 @@ impl ElementStore {
     }
 
     fn upsert_at(&mut self, id: usize, focus_number: f64, element: Element) {
-        self.store
-            .upsert(id, focus_number, StoredElement::new(id, focus_number, element));
+        self.store.upsert(
+            id,
+            focus_number,
+            StoredElement::new(id, focus_number, element),
+        );
     }
 
     /// Inserts a new element and returns its assigned id.

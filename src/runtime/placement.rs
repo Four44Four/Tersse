@@ -8,7 +8,7 @@ use crate::Location;
 use super::layout::{
     render_height_for_button, render_height_for_text_display, render_height_for_text_input_text,
 };
-use super::types::RuntimeElement;
+use super::types::{ElementConfig, ElementHeightMode, RuntimeElement};
 use super::RuntimeUi;
 
 impl RuntimeUi {
@@ -27,12 +27,8 @@ impl RuntimeUi {
             ..candidate
         };
         let others = self.collect_overlap_candidates(id);
-        let (location, shifts) = resolve_overlap_location(
-            candidate,
-            &others,
-            id,
-            placement.parent_id,
-        );
+        let (location, shifts) =
+            resolve_overlap_location(candidate, &others, id, placement.parent_id);
         for (min_y, delta) in shifts {
             self.push_elements_down_from(min_y, delta, &[id]);
         }
@@ -78,12 +74,7 @@ impl RuntimeUi {
     }
 
     /// Pulls root-positioned elements at `y >= min_y` up, then recomputes relative children.
-    pub(super) fn pull_elements_up_from(
-        &mut self,
-        min_y: u16,
-        rows: u16,
-        exclude_ids: &[usize],
-    ) {
+    pub(super) fn pull_elements_up_from(&mut self, min_y: u16, rows: u16, exclude_ids: &[usize]) {
         if rows == 0 {
             return;
         }
@@ -201,49 +192,35 @@ impl RuntimeUi {
     }
 
     pub(super) fn runtime_element_bounds(&self, element: &RuntimeElement) -> ElementBounds {
-        match element {
-            RuntimeElement::Button(button) => ElementBounds {
-                x: button.button.location.x,
-                y: button.button.location.y,
-                width: button.button.width,
-                height: render_height_for_button(),
-            },
-            RuntimeElement::TextInput(input) => {
-                let width = input.field.width.max(1);
-                let height = render_height_for_text_input_text(&input.field.text, width);
-                ElementBounds {
-                    x: input.location.x,
-                    y: input.location.y,
-                    width,
-                    height,
-                }
+        let height = if element.text_input.is_some() {
+            render_height_for_text_input_text(&element.text, element.width.max(1))
+        } else {
+            match element.height_mode {
+                ElementHeightMode::Fixed(height) => render_height_for_text_display(height),
+                ElementHeightMode::FitContent => render_height_for_button(),
             }
-            RuntimeElement::TextDisplay(display) => ElementBounds {
-                x: display.location.x,
-                y: display.location.y,
-                width: display.width,
-                height: render_height_for_text_display(display.height),
-            },
+        };
+        ElementBounds {
+            x: element.location.x,
+            y: element.location.y,
+            width: element.width.max(1),
+            height,
         }
     }
 
     pub(super) fn placement_for(&self, id: usize) -> Option<ElementPlacement> {
-        match self.element_by_id(ElementId::from_internal(id))? {
-            RuntimeElement::Button(button) => Some(button.placement.clone()),
-            RuntimeElement::TextInput(input) => Some(input.placement.clone()),
-            RuntimeElement::TextDisplay(display) => Some(display.placement.clone()),
-        }
+        Some(
+            self.element_by_id(ElementId::from_internal(id))?
+                .placement
+                .clone(),
+        )
     }
 
     pub(super) fn set_element_location_by_id(&mut self, id: usize, location: Location) -> bool {
         let Some(element) = self.element_mut_by_id(ElementId::from_internal(id)) else {
             return false;
         };
-        match element {
-            RuntimeElement::Button(button) => button.button.location = location,
-            RuntimeElement::TextInput(input) => input.location = location,
-            RuntimeElement::TextDisplay(display) => display.location = location,
-        }
+        element.location = location;
         true
     }
 
@@ -292,15 +269,10 @@ impl RuntimeUi {
                 if id == skip_id {
                     return None;
                 }
-                let placement = match element {
-                    RuntimeElement::Button(button) => button.placement.clone(),
-                    RuntimeElement::TextInput(input) => input.placement.clone(),
-                    RuntimeElement::TextDisplay(display) => display.placement.clone(),
-                };
                 Some((
                     id,
                     self.runtime_element_bounds(element),
-                    placement.parent_id,
+                    element.placement.parent_id,
                 ))
             })
             .collect()
@@ -309,49 +281,36 @@ impl RuntimeUi {
     fn all_placements(&self) -> Vec<(usize, ElementPlacement)> {
         self.elements
             .iter()
-            .map(|element| {
-                let placement = match element {
-                    RuntimeElement::Button(button) => button.placement.clone(),
-                    RuntimeElement::TextInput(input) => input.placement.clone(),
-                    RuntimeElement::TextDisplay(display) => display.placement.clone(),
-                };
-                (element.id(), placement)
-            })
+            .map(|element| (element.id(), element.placement.clone()))
             .collect()
     }
 
     fn element_dimensions(&mut self, id: usize) -> Option<(usize, usize)> {
         let element_id = ElementId::from_internal(id);
-        match self.element_by_id(element_id)? {
-            RuntimeElement::Button(button) => Some((button.button.width, render_height_for_button())),
-            RuntimeElement::TextInput(input) => {
-                let width = input.field.width.max(1);
-                let height = self.text_input_render_height(element_id)?;
-                Some((width, height))
-            }
-            RuntimeElement::TextDisplay(display) => Some((
-                display.width,
-                render_height_for_text_display(display.height),
-            )),
+        let element = self.element_by_id(element_id)?;
+        if element.text_input.is_some() {
+            let width = element.width.max(1);
+            let height = self.text_input_render_height(element_id)?;
+            return Some((width, height));
         }
+        let width = element.width.max(1);
+        let height = match element.height_mode {
+            ElementHeightMode::Fixed(height) => render_height_for_text_display(height),
+            ElementHeightMode::FitContent => render_height_for_button(),
+        };
+        Some((width, height))
     }
 
-    pub(super) fn button_config_dimensions(config: &super::types::ButtonConfig) -> (usize, usize) {
-        (config.width.max(1), render_height_for_button())
-    }
-
-    pub(super) fn text_input_config_dimensions(
-        config: &super::types::TextInputConfig,
-    ) -> (usize, usize) {
+    pub(super) fn element_config_dimensions(config: &ElementConfig) -> (usize, usize) {
         let width = config.width.max(1);
-        let height = render_height_for_text_input_text(&config.initial_text, width);
-        (width, height)
-    }
-
-    pub(super) fn text_display_config_dimensions(
-        config: &super::types::TextDisplayConfig,
-    ) -> (usize, usize) {
-        let (width, height) = super::types::clamp_text_display_dimensions(config.width, config.height);
+        let height = if config.text_input.is_some() {
+            render_height_for_text_input_text(&config.text, width)
+        } else {
+            match config.height_mode {
+                ElementHeightMode::Fixed(height) => render_height_for_text_display(height),
+                ElementHeightMode::FitContent => render_height_for_button(),
+            }
+        };
         (width, height)
     }
 }

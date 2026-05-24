@@ -20,11 +20,7 @@ pub fn screen_viewport_height(terminal_max_y: i32) -> usize {
 }
 
 /// Clamp a screen scroll offset to valid bounds.
-pub fn clamp_screen_scroll(
-    offset: usize,
-    content_height: usize,
-    viewport_height: usize,
-) -> usize {
+pub fn clamp_screen_scroll(offset: usize, content_height: usize, viewport_height: usize) -> usize {
     scroll_view::clamp_scroll_offset(offset, content_height, viewport_height)
 }
 
@@ -34,11 +30,7 @@ pub fn scroll_screen_up(offset: usize) -> usize {
 }
 
 /// Scroll the screen down by one row (increase offset).
-pub fn scroll_screen_down(
-    offset: usize,
-    content_height: usize,
-    viewport_height: usize,
-) -> usize {
+pub fn scroll_screen_down(offset: usize, content_height: usize, viewport_height: usize) -> usize {
     scroll_view::scroll_line_down(offset, content_height, viewport_height)
 }
 

@@ -7,7 +7,7 @@ use crate::Color;
 use super::layout::{
     render_height_for_button, render_height_for_text_display, render_height_for_text_input_text,
 };
-use super::types::RuntimeElement;
+use super::types::{ElementHeightMode, RuntimeElement};
 use super::RuntimeUi;
 
 impl RuntimeUi {
@@ -47,22 +47,22 @@ impl RuntimeUi {
 
     fn existing_element_screen_rect(&self, id: usize) -> Option<(i32, i32, i32, i32)> {
         let element = self.elements.get(id)?;
-        let (location, width, height) = match element {
-            RuntimeElement::Button(button) => (
-                button.button.location,
-                button.button.width.max(1),
+        let (location, width, height) = if element.text_input.is_some() {
+            let width = element.width.max(1);
+            let height = render_height_for_text_input_text(&element.text, width);
+            (element.location, width, height)
+        } else if let ElementHeightMode::Fixed(height) = element.height_mode {
+            (
+                element.location,
+                element.width.max(1),
+                render_height_for_text_display(height),
+            )
+        } else {
+            (
+                element.location,
+                element.width.max(1),
                 render_height_for_button(),
-            ),
-            RuntimeElement::TextInput(input) => {
-                let width = input.field.width.max(1);
-                let height = render_height_for_text_input_text(&input.field.text, width);
-                (input.location, width, height)
-            }
-            RuntimeElement::TextDisplay(display) => (
-                display.location,
-                display.width.max(1),
-                render_height_for_text_display(display.height),
-            ),
+            )
         };
 
         let x = location.x as i32;

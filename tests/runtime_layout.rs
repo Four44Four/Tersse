@@ -1,20 +1,12 @@
-use tersse::{
-    runtime_render_height_for_button, runtime_render_height_for_text_display,
-    runtime_render_height_for_text_input_text,
-};
-
-#[test]
-fn render_height_for_button_is_one_row() {
-    assert_eq!(runtime_render_height_for_button(), 1);
-}
+use tersse::{runtime_clamp_fixed_height, runtime_render_height_for_element_text};
 
 #[test]
 fn render_height_for_text_input_grows_with_wrapped_lines() {
-    assert_eq!(runtime_render_height_for_text_input_text("abcde", 3), 2);
+    assert_eq!(runtime_render_height_for_element_text("abcde", 3), 2);
 }
 
 #[test]
-fn render_height_for_text_display_uses_fixed_viewport_height() {
-    assert_eq!(runtime_render_height_for_text_display(4), 4);
-    assert_eq!(runtime_render_height_for_text_display(0), 1);
+fn fixed_height_is_clamped_to_minimum_one() {
+    assert_eq!(runtime_clamp_fixed_height(4), 4);
+    assert_eq!(runtime_clamp_fixed_height(0), 1);
 }

@@ -3,16 +3,16 @@ use std::time::{Duration, Instant};
 use crate::constants::UI_REDRAW_DEBOUNCE_QUEUE_UPDATE_MS;
 use crate::pure::focus_order;
 use crate::pure::resize_debounce;
-use crate::pure::ui_redraw;
-use crate::ElementId;
 use crate::pure::scroll_view;
 use crate::pure::terminal_bounds;
 use crate::pure::text_input::{self, TextInputState};
 use crate::pure::text_wrap;
+use crate::pure::ui_redraw;
+use crate::ElementId;
 use crate::TitleAlignment;
 use pancurses::{curs_set, COLOR_PAIR};
 
-use super::types::RuntimeElement;
+use super::types::ElementHeightMode;
 use super::RuntimeUi;
 
 impl RuntimeUi {
@@ -204,11 +204,15 @@ impl RuntimeUi {
     }
 
     fn draw_element(&mut self, id: usize) {
-        match self.elements.get(id) {
-            Some(RuntimeElement::Button(_)) => self.draw_button(id),
-            Some(RuntimeElement::TextInput(_)) => self.draw_text_input(id),
-            Some(RuntimeElement::TextDisplay(_)) => self.draw_text_display(id),
-            None => {}
+        let Some(element) = self.elements.get(id) else {
+            return;
+        };
+        if element.text_input.is_some() {
+            self.draw_text_input(id);
+        } else if matches!(element.height_mode, ElementHeightMode::Fixed(_)) {
+            self.draw_text_display(id);
+        } else {
+            self.draw_button(id);
         }
     }
 
@@ -235,18 +239,13 @@ impl RuntimeUi {
 
     fn draw_button(&mut self, id: usize) {
         let (location, text, width, style) = match self.elements.get(id) {
-            Some(RuntimeElement::Button(button)) => {
-                let style = if button.button.focused {
-                    button.style.focused
+            Some(element) => {
+                let style = if element.focused {
+                    element.style.focused
                 } else {
-                    button.style.unfocused
+                    element.style.unfocused
                 };
-                (
-                    button.button.location,
-                    button.button.display_string.clone(),
-                    button.button.width,
-                    style,
-                )
+                (element.location, element.text.clone(), element.width, style)
             }
             _ => return,
         };
@@ -261,7 +260,8 @@ impl RuntimeUi {
         if draw_h <= 0 {
             return;
         }
-        let row_cols = self.cols_for_printing_respecting_message_gutter(x, max_x, y, max_y) as usize;
+        let row_cols =
+            self.cols_for_printing_respecting_message_gutter(x, max_x, y, max_y) as usize;
         let draw_width = width.max(1).min(row_cols);
 
         let label = crate::pure::button::truncate_label(&text, draw_width);
@@ -281,22 +281,25 @@ impl RuntimeUi {
 
     fn draw_text_input(&mut self, id: usize) {
         let (location, width, text, cursor, selection_anchor, style) = match self.elements.get(id) {
-            Some(RuntimeElement::TextInput(input)) => {
-                let style = if input.field.locked {
-                    if input.field.focused {
+            Some(element) => {
+                let Some(input) = element.text_input.as_ref() else {
+                    return;
+                };
+                let style = if input.locked {
+                    if element.focused {
                         input.style.focused_locked
                     } else {
                         input.style.unfocused_locked
                     }
-                } else if input.field.focused {
+                } else if element.focused {
                     input.style.focused_unlocked
                 } else {
                     input.style.unfocused_unlocked
                 };
                 (
-                    input.location,
-                    input.field.width.max(1),
-                    input.field.text.clone(),
+                    element.location,
+                    element.width.max(1),
+                    element.text.clone(),
                     input.cursor,
                     input.selection_anchor,
                     (style, input.style.selection),
@@ -327,8 +330,7 @@ impl RuntimeUi {
         let selection = text_input::selection_range(&state);
         let highlight_cells = text_wrap::selection_highlight_cells(&text, selection, width);
 
-        let visible_lines =
-            terminal_bounds::visible_element_line_range(y, logical_rows, max_y);
+        let visible_lines = terminal_bounds::visible_element_line_range(y, logical_rows, max_y);
         let visible_start = visible_lines.start;
         let visible_end = visible_lines.end;
         for line_idx in visible_lines {
@@ -407,18 +409,21 @@ impl RuntimeUi {
 
     fn draw_text_display(&mut self, id: usize) {
         let (location, width, height, text, scroll, style) = match self.elements.get(id) {
-            Some(RuntimeElement::TextDisplay(display)) => {
-                let style = if display.display.focused {
-                    display.style.focused
+            Some(element) => {
+                let ElementHeightMode::Fixed(height) = element.height_mode else {
+                    return;
+                };
+                let style = if element.focused {
+                    element.style.focused
                 } else {
-                    display.style.unfocused
+                    element.style.unfocused
                 };
                 (
-                    display.location,
-                    display.width.max(1),
-                    display.height.max(1),
-                    display.display.text.clone(),
-                    display.scroll,
+                    element.location,
+                    element.width.max(1),
+                    height.max(1),
+                    element.text.clone(),
+                    element.scroll,
                     style,
                 )
             }
@@ -501,8 +506,7 @@ impl RuntimeUi {
         if w <= 0 || logical_rows <= 0 {
             return;
         }
-        let visible_rows =
-            terminal_bounds::visible_element_line_range(y, logical_rows, max_y);
+        let visible_rows = terminal_bounds::visible_element_line_range(y, logical_rows, max_y);
         self.win.attron(COLOR_PAIR(pair as u64));
         for row in visible_rows {
             let row_y = y + row;
@@ -532,24 +536,30 @@ impl RuntimeUi {
             return;
         };
 
-        let Some(RuntimeElement::TextInput(input)) = self.element_by_id(focused_id) else {
+        let Some(input) = self.element_by_id(focused_id) else {
             let _ = curs_set(0);
             return;
         };
 
-        if input.field.locked {
+        let Some(text_input) = input.text_input.as_ref() else {
+            let _ = curs_set(0);
+            return;
+        };
+
+        if text_input.locked {
             let _ = curs_set(0);
             return;
         }
 
-        let width = input.field.width.max(1);
-        let (line, col) =
-            text_wrap::cursor_display_position(&input.field.text, input.cursor, width);
+        let width = input.width.max(1);
+        let (line, col) = text_wrap::cursor_display_position(&input.text, text_input.cursor, width);
         let (max_y, max_x) = self.win.get_max_yx();
         let x = input.location.x as i32;
         let y = self.scrolled_y(input.location.y as i32);
         let row_y = y + line as i32;
-        if !terminal_bounds::row_is_visible(row_y, max_y) || self.is_message_gutter_screen_row(row_y) {
+        if !terminal_bounds::row_is_visible(row_y, max_y)
+            || self.is_message_gutter_screen_row(row_y)
+        {
             let _ = curs_set(0);
             return;
         }

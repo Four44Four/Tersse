@@ -1,6 +1,6 @@
 use std::time::{Duration, Instant};
 
-use tersse::pure::ui_redraw::{ElementRedrawPlan, should_flush_debounced_queue_redraw};
+use tersse::pure::ui_redraw::{should_flush_debounced_queue_redraw, ElementRedrawPlan};
 
 #[test]
 fn redraw_plan_marks_only_minimum_requested_elements() {

@@ -6,9 +6,9 @@ use pancurses::Window;
 use crate::ScreenTitle;
 
 mod colors;
+mod core;
 #[cfg(debug_draw_do_delay)]
 mod debug_draw_delay;
-mod core;
 mod element_store;
 mod elements;
 mod events;
@@ -24,8 +24,8 @@ mod types;
 mod ui_session;
 
 pub use types::{
-    ButtonConfig, ButtonHandler, ElementConfig, FocusStyle, Style, TextDisplayConfig,
-    TextInputConfig, TextInputStyle,
+    ElementConfig, ElementHandler, ElementHeightMode, FocusStyle, Style, TextInputBehavior,
+    TextInputStyle,
 };
 pub use ui_session::UiSession;
 
@@ -67,20 +67,12 @@ pub fn runtime_terminal_color_code(color: crate::Color) -> i16 {
     colors::terminal_color_code(color)
 }
 
-pub fn runtime_render_height_for_button() -> usize {
-    layout::render_height_for_button()
-}
-
-pub fn runtime_render_height_for_text_input_text(text: &str, width: usize) -> usize {
+pub fn runtime_render_height_for_element_text(text: &str, width: usize) -> usize {
     layout::render_height_for_text_input_text(text, width)
 }
 
-pub fn runtime_render_height_for_text_display(height: usize) -> usize {
-    layout::render_height_for_text_display(height)
-}
-
-pub fn runtime_clamp_text_display_dimensions(width: usize, height: usize) -> (usize, usize) {
-    types::clamp_text_display_dimensions(width, height)
+pub fn runtime_clamp_fixed_height(height: usize) -> usize {
+    types::clamp_fixed_height(height)
 }
 
 pub fn runtime_text_input_state_snapshot(

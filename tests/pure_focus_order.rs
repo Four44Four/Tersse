@@ -5,12 +5,7 @@ use tersse::pure::focus_order::{
 
 #[test]
 fn sorted_ids_uses_focus_then_id() {
-    let sorted = sorted_ids(vec![
-        (2.0, 3),
-        (0.0, 1),
-        (0.0, 0),
-        (1.0, 2),
-    ]);
+    let sorted = sorted_ids(vec![(2.0, 3), (0.0, 1), (0.0, 0), (1.0, 2)]);
     assert_eq!(sorted, vec![0, 1, 2, 3]);
 }
 

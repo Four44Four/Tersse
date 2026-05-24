@@ -1,3 +1,19 @@
+ - Base element has:
+    - Absolute position or parent element and relative position
+    - Fixed width
+    - Solid bg color
+    - Text display with fg color
+    - Can have fixed height and is scrollable by Alt/Meta + Up/Down keys when focused OR can have height that always conforms to text wrapped height
+       - Fixed height will cause all text that overflows the element to be hidden
+          - Scrolling with Alt/Meta + Up/Down keys when focused will hide the top most line and reveal the next hidden line until the end of the element is scrolled to
+    - Supports composition pattern using any combination of the following properties:
+       - Can have a callback function that runs (synchronously on UI thread) when Space or Enter key is pressed while the element is focused
+       - Can have a text input property that overrides keybinds and allows behavior according to ./specifications/tui_element_text_input_property.txt when it is focused
+          - Without this property:
+             - The element's text content is not mutable through user keyboard input, but can still be updated through API functions to directly change the text display content
+    - Element properties can be dynamically modified (in the context of the UI thread) to change their function
+       - EXAMPLE: 
+          - An element can behave like a static text display, but be later changed to become a button that responds to Space/Enter key input when focused, and the button can also be made into a text input that can support keystrokes and left/right arrow keys to add/remove text
  - Can be focused by navigating through page by pressing arrow keys
  - Has a fixed order of focus cycling explicitly defined
     - Similar to tab navigation order in webpages

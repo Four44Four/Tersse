@@ -32,22 +32,16 @@ impl RuntimeUi {
     pub(super) fn screen_scroll_bounds(&self) -> (usize, usize) {
         let (max_y, _) = self.win.get_max_yx();
         let viewport_height = screen_scroll::screen_viewport_height(max_y);
-        let spans = self.elements.iter().map(|element| {
-                let y = match element {
-                    super::types::RuntimeElement::Button(button) => button.button.location.y,
-                    super::types::RuntimeElement::TextInput(input) => input.location.y,
-                    super::types::RuntimeElement::TextDisplay(display) => display.location.y,
-                };
-                let height = self
-                    .cached_heights
-                    .get(&element.id())
-                    .copied()
-                    .unwrap_or(1);
+        let spans = self
+            .elements
+            .iter()
+            .map(|element| {
+                let y = element.location.y;
+                let height = self.cached_heights.get(&element.id()).copied().unwrap_or(1);
                 (y, height)
             })
             .collect::<Vec<_>>();
-        let content_height =
-            screen_scroll::screen_content_height(self.title.is_some(), &spans);
+        let content_height = screen_scroll::screen_content_height(self.title.is_some(), &spans);
         (content_height, viewport_height)
     }
 

@@ -5,16 +5,14 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use tersse::prelude::*;
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
-use tersse::prelude::*;
 
-use style::{button_style, locked_like_style, screen_title, text_input_style};
+use style::{button_style, locked_like_style, screen_title, text_element_style, text_input_style};
 
 const FLASH_FOO: Duration = Duration::from_secs(2);
 const FLASH_BAR: Duration = Duration::from_secs(5);
-const FOO_BAR_BUTTON_WIDTH: usize = 5;
-const MUNG_BUTTON_WIDTH: usize = 5;
 const MUNG_BAR_MARGIN: u16 = 3;
 const INPUT_WIDTH: usize = 20;
 const PRESS_LABEL: &str = "Press Me !!";
@@ -90,17 +88,16 @@ impl App {
     }
 
     fn handle_press(&mut self, ui: &mut RuntimeUi, app: Rc<RefCell<Option<App>>>) {
-        let input = ui.read_text_input(self.input_id).unwrap_or_default();
+        let input = ui.read_element_text(self.input_id).unwrap_or_default();
         let result = build_result_text(&input);
-        let _ = ui.set_text_input_lock_status(self.input_id, true);
+        let _ = ui.set_element_lock_status(self.input_id, true);
 
         let clear_x = PRESS_LABEL.chars().count().max(1) + 1;
 
         if self.clear_id.is_none() {
-            self.clear_id = Some(ui.create_button(ButtonConfig {
-                label: CLEAR_LABEL.to_string(),
-                width: CLEAR_LABEL.chars().count().max(1),
-                placement: ElementPlacement::relative_to(
+            self.clear_id = Some(ui.create_element(button_element(
+                CLEAR_LABEL,
+                ElementPlacement::relative_to(
                     self.input_id,
                     ParentSide::Bottom,
                     Location {
@@ -108,27 +105,30 @@ impl App {
                         y: 0,
                     },
                 ),
-                focus_number: 4.0,
-                style: button_style(),
-                on_press: Box::new(move |ui| {
+                4.0,
+                Box::new(move |ui| {
                     app.borrow_mut().as_mut().unwrap().handle_clear(ui);
                 }),
-            }));
+            )));
         }
 
         if !self.result_visible {
-            self.result_id = Some(ui.create_text_display(TextDisplayConfig {
-                placement: ElementPlacement::relative_to(
-                    self.press_id,
-                    ParentSide::Bottom,
-                    Location::default(),
+            self.result_id = Some(
+                ui.create_element(
+                    ElementConfig::new(
+                        ElementPlacement::relative_to(
+                            self.press_id,
+                            ParentSide::Bottom,
+                            Location::default(),
+                        ),
+                        DISPLAY_WIDTH,
+                        5.0,
+                        locked_like_style(),
+                    )
+                    .with_fixed_height(RESULT_HEIGHT)
+                    .with_text(result),
                 ),
-                width: DISPLAY_WIDTH,
-                height: RESULT_HEIGHT,
-                focus_number: 5.0,
-                style: locked_like_style(),
-                initial_text: result,
-            }));
+            );
             self.result_visible = true;
         }
     }
@@ -140,7 +140,7 @@ impl App {
         if let Some(clear_id) = self.clear_id.take() {
             let _ = ui.remove_element(clear_id);
         }
-        let _ = ui.set_text_input_lock_status(self.input_id, false);
+        let _ = ui.set_element_lock_status(self.input_id, false);
         self.result_visible = false;
     }
 
@@ -153,22 +153,16 @@ impl App {
         text: &str,
     ) -> ElementId {
         let width = text.chars().count().max(1);
-        let placement = ElementPlacement::relative_to(
-            button_id,
-            ParentSide::Bottom,
-            Location::default(),
-        );
+        let placement =
+            ElementPlacement::relative_to(button_id, ParentSide::Bottom, Location::default());
         if !display_id.is_none() {
             return display_id.expect("what");
         }
-        ui.create_text_display(TextDisplayConfig {
-            placement,
-            width,
-            height: 1,
-            focus_number,
-            style: locked_like_style(),
-            initial_text: text.to_string(),
-        })
+        ui.create_element(
+            ElementConfig::new(placement, width, focus_number, locked_like_style())
+                .with_fixed_height(1)
+                .with_text(text),
+        )
     }
 }
 
@@ -199,44 +193,39 @@ fn main() {
     let foo_app = Rc::clone(&app);
     let foo_runtime = runtime.clone();
     let foo_session = session.clone();
-    let foo_id = ui.create_button(ButtonConfig {
-        label: "Foo".to_string(),
-        width: FOO_BAR_BUTTON_WIDTH,
-        placement: ElementPlacement::absolute(Location { x: 0, y: 2 }),
-        focus_number: 0.0,
-        style: button_style(),
-        on_press: Box::new(move |ui| {
-            foo_app
-                .borrow_mut()
-                .as_mut()
-                .unwrap()
-                .handle_foo(ui, foo_runtime.clone(), &foo_session);
+    let foo_id = ui.create_element(button_element(
+        "Foo",
+        ElementPlacement::absolute(Location { x: 0, y: 2 }),
+        0.0,
+        Box::new(move |ui| {
+            foo_app.borrow_mut().as_mut().unwrap().handle_foo(
+                ui,
+                foo_runtime.clone(),
+                &foo_session,
+            );
         }),
-    });
+    ));
 
     let bar_app = Rc::clone(&app);
     let bar_runtime = runtime.clone();
     let bar_session = session.clone();
-    let bar_id = ui.create_button(ButtonConfig {
-        label: "Bar".to_string(),
-        width: FOO_BAR_BUTTON_WIDTH,
-        placement: ElementPlacement::absolute(Location { x: 0, y: 3 }),
-        focus_number: 1.0,
-        style: button_style(),
-        on_press: Box::new(move |ui| {
-            bar_app
-                .borrow_mut()
-                .as_mut()
-                .unwrap()
-                .handle_bar(ui, bar_runtime.clone(), &bar_session);
+    let bar_id = ui.create_element(button_element(
+        "Bar",
+        ElementPlacement::absolute(Location { x: 0, y: 3 }),
+        1.0,
+        Box::new(move |ui| {
+            bar_app.borrow_mut().as_mut().unwrap().handle_bar(
+                ui,
+                bar_runtime.clone(),
+                &bar_session,
+            );
         }),
-    });
+    ));
 
     let mung_session = session.clone();
-    let _mung_id = ui.create_button(ButtonConfig {
-        label: "Mung".to_string(),
-        width: MUNG_BUTTON_WIDTH,
-        placement: ElementPlacement::relative_to(
+    let _mung_id = ui.create_element(button_element(
+        "Mung",
+        ElementPlacement::relative_to(
             bar_id,
             ParentSide::Right,
             Location {
@@ -244,37 +233,36 @@ fn main() {
                 y: 0,
             },
         ),
-        focus_number: 1.5,
-        style: button_style(),
-        on_press: Box::new(move |_ui| {
+        1.5,
+        Box::new(move |_ui| {
             mung_session.send_message(format!("{}What ?", random_base64_chars(5)));
         }),
-    });
+    ));
 
-    let input_id = ui.create_text_input(TextInputConfig {
-        width: INPUT_WIDTH,
-        placement: ElementPlacement::absolute(Location { x: 0, y: 4 }),
-        focus_number: 2.0,
-        style: text_input_style(),
-        locked: false,
-        initial_text: String::new(),
-    });
+    let input_id = ui.create_element(
+        ElementConfig::new(
+            ElementPlacement::absolute(Location { x: 0, y: 4 }),
+            INPUT_WIDTH,
+            2.0,
+            text_element_style(),
+        )
+        .with_fit_content_height()
+        .with_text_input(TextInputBehavior::new(text_input_style()).with_locked(false)),
+    );
 
     let press_app = Rc::clone(&app);
-    let press_id = ui.create_button(ButtonConfig {
-        label: PRESS_LABEL.to_string(),
-        width: PRESS_LABEL.chars().count().max(1),
-        placement: ElementPlacement::relative_to(input_id, ParentSide::Bottom, Location::default()),
-        focus_number: 3.0,
-        style: button_style(),
-        on_press: Box::new(move |ui| {
+    let press_id = ui.create_element(button_element(
+        PRESS_LABEL,
+        ElementPlacement::relative_to(input_id, ParentSide::Bottom, Location::default()),
+        3.0,
+        Box::new(move |ui| {
             press_app
                 .borrow_mut()
                 .as_mut()
                 .unwrap()
                 .handle_press(ui, Rc::clone(&press_app));
         }),
-    });
+    ));
 
     app.borrow_mut()
         .replace(App::new(foo_id, bar_id, input_id, press_id));
@@ -285,6 +273,23 @@ fn main() {
 fn build_result_text(input: &str) -> String {
     let reversed = input.chars().rev().collect::<String>();
     reversed.repeat(10)
+}
+
+fn button_element(
+    label: &str,
+    placement: ElementPlacement,
+    focus_number: f64,
+    on_activate: ElementHandler,
+) -> ElementConfig {
+    ElementConfig::new(
+        placement,
+        5,
+        focus_number,
+        button_style(),
+    )
+    .with_fixed_height(1)
+    .with_text(label)
+    .with_on_activate(on_activate)
 }
 
 fn random_base64_chars(count: usize) -> String {

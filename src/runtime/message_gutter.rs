@@ -8,7 +8,7 @@ use crate::constants::{
     MSG_GUTTER_MULTI_MSG_STR, MSG_GUTTER_SIDE,
 };
 use crate::pure::message_gutter::{
-    self, MessageGutterLine, gutter_rows_to_restore, gutter_screen_rows,
+    self, gutter_rows_to_restore, gutter_screen_rows, MessageGutterLine,
 };
 use crate::pure::terminal_bounds;
 use crate::Color;
@@ -26,16 +26,11 @@ impl RuntimeUi {
             return 0..0;
         }
         let (max_y, _) = self.win.get_max_yx();
-        gutter_screen_rows(
-            MSG_GUTTER_SIDE,
-            self.message_gutter.rendered_height,
-            max_y,
-        )
+        gutter_screen_rows(MSG_GUTTER_SIDE, self.message_gutter.rendered_height, max_y)
     }
 
     pub(super) fn is_message_gutter_screen_row(&self, screen_y: i32) -> bool {
-        self.message_gutter_screen_row_range()
-            .contains(&screen_y)
+        self.message_gutter_screen_row_range().contains(&screen_y)
     }
 
     pub(super) fn cols_for_printing_respecting_message_gutter(
@@ -82,8 +77,7 @@ impl RuntimeUi {
         let previous_height = self.message_gutter.rendered_height;
         self.message_gutter =
             message_gutter::apply_message(&self.message_gutter, message, already_visible);
-        self.message_gutter_expires_at =
-            Some(now + Duration::from_millis(MSG_GUTTER_DURA_MS));
+        self.message_gutter_expires_at = Some(now + Duration::from_millis(MSG_GUTTER_DURA_MS));
         self.refresh_message_gutter_after_change(previous_height);
     }
 
@@ -156,12 +150,7 @@ impl RuntimeUi {
             terminal_width,
             MSG_GUTTER_MAX_HEIGHT,
         );
-        let restore = gutter_rows_to_restore(
-            MSG_GUTTER_SIDE,
-            previous_height,
-            new_height,
-            max_y,
-        );
+        let restore = gutter_rows_to_restore(MSG_GUTTER_SIDE, previous_height, new_height, max_y);
         if !restore.is_empty() {
             self.restore_screen_rows(restore);
         }
@@ -178,7 +167,8 @@ impl RuntimeUi {
         message_pair: i16,
         indicator_pair: i16,
     ) {
-        let row_cols = self.cols_for_printing_respecting_message_gutter(0, max_x, screen_y, max_y) as usize;
+        let row_cols =
+            self.cols_for_printing_respecting_message_gutter(0, max_x, screen_y, max_y) as usize;
         if row_cols == 0 {
             return;
         }
@@ -251,11 +241,7 @@ impl RuntimeUi {
             let Some(location) = self.element_location(element_id) else {
                 continue;
             };
-            let height = self
-                .cached_heights
-                .get(&id)
-                .copied()
-                .unwrap_or(1);
+            let height = self.cached_heights.get(&id).copied().unwrap_or(1);
             if message_gutter::element_row_intersects_gutter_screen_rows(
                 location.y,
                 height,

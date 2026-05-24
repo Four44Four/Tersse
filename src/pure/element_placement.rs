@@ -59,22 +59,10 @@ pub fn default_child_location(
     side: ParentSide,
 ) -> Location {
     let (x, y) = match side {
-        ParentSide::Left => (
-            parent.x.saturating_sub(child.width as u16),
-            parent.y,
-        ),
-        ParentSide::Right => (
-            parent.x.saturating_add(parent.width as u16),
-            parent.y,
-        ),
-        ParentSide::Top => (
-            parent.x,
-            parent.y.saturating_sub(child.height as u16),
-        ),
-        ParentSide::Bottom => (
-            parent.x,
-            parent.y.saturating_add(parent.height as u16),
-        ),
+        ParentSide::Left => (parent.x.saturating_sub(child.width as u16), parent.y),
+        ParentSide::Right => (parent.x.saturating_add(parent.width as u16), parent.y),
+        ParentSide::Top => (parent.x, parent.y.saturating_sub(child.height as u16)),
+        ParentSide::Bottom => (parent.x, parent.y.saturating_add(parent.height as u16)),
     };
     Location { x, y }
 }
@@ -152,12 +140,7 @@ pub fn resolve_overlap_location(
     loop {
         let mut changed = false;
         for (other_id, other_bounds, other_parent) in &mut adjusted_others {
-            if is_parent_child(
-                candidate_parent,
-                *other_parent,
-                candidate_id,
-                *other_id,
-            ) {
+            if is_parent_child(candidate_parent, *other_parent, candidate_id, *other_id) {
                 continue;
             }
             if !rectangles_overlap(candidate, *other_bounds) {
@@ -216,10 +199,7 @@ pub fn direct_children<'a>(
 /// Collects all descendant ids (depth-first).
 pub fn descendant_ids(root_id: usize, placements: &[(usize, ElementPlacement)]) -> Vec<usize> {
     let mut out = Vec::new();
-    let mut stack = direct_children(
-        root_id,
-        placements.iter().map(|(id, p)| (*id, p)),
-    );
+    let mut stack = direct_children(root_id, placements.iter().map(|(id, p)| (*id, p)));
     while let Some(id) = stack.pop() {
         out.push(id);
         stack.extend(direct_children(
@@ -229,4 +209,3 @@ pub fn descendant_ids(root_id: usize, placements: &[(usize, ElementPlacement)]) 
     }
     out
 }
-

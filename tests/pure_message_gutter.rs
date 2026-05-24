@@ -74,10 +74,7 @@ fn gutter_screen_rows_top_and_bottom() {
 
 #[test]
 fn gutter_rows_to_restore_only_returns_rows_dropped_on_shrink() {
-    assert_eq!(
-        gutter_rows_to_restore(MsgGutterSide::Top, 3, 1, 10),
-        1..3
-    );
+    assert_eq!(gutter_rows_to_restore(MsgGutterSide::Top, 3, 1, 10), 1..3);
     assert_eq!(
         gutter_rows_to_restore(MsgGutterSide::Bottom, 3, 1, 10),
         7..9
@@ -102,7 +99,10 @@ fn bottom_gutter_screen_rows_stay_within_visible_content() {
 #[test]
 fn row_above_bottom_gutter_must_clip_printable_columns() {
     let gutter_rows = gutter_screen_rows(MsgGutterSide::Bottom, 1, 23);
-    assert!(row_printing_wraps_into_gutter_block(gutter_rows.clone(), 21));
+    assert!(row_printing_wraps_into_gutter_block(
+        gutter_rows.clone(),
+        21
+    ));
     assert!(!row_printing_wraps_into_gutter_block(gutter_rows, 20));
 
     let full_width_cols = 80;
@@ -119,8 +119,18 @@ fn row_above_bottom_gutter_must_clip_printable_columns() {
 #[test]
 fn element_intersection_uses_screen_scroll_offset() {
     let rows = 0..1;
-    assert!(element_row_intersects_gutter_screen_rows(0, 1, 0, rows.clone()));
-    assert!(!element_row_intersects_gutter_screen_rows(2, 1, 0, rows.clone()));
+    assert!(element_row_intersects_gutter_screen_rows(
+        0,
+        1,
+        0,
+        rows.clone()
+    ));
+    assert!(!element_row_intersects_gutter_screen_rows(
+        2,
+        1,
+        0,
+        rows.clone()
+    ));
     assert!(element_row_intersects_gutter_screen_rows(3, 1, 3, rows));
 }
 

@@ -1,8 +1,5 @@
 use crate::pure::text_input::TextInputState;
-use crate::{
-    create_button, create_text_display_element, create_text_input_field_element, Button, Color,
-    ElementPlacement, Location, TextDisplayElement, TextInputField,
-};
+use crate::{Color, ElementPlacement, Location};
 
 use super::RuntimeUi;
 
@@ -27,37 +24,26 @@ pub struct TextInputStyle {
     pub selection: Style,
 }
 
-pub struct ButtonConfig {
-    pub label: String,
-    pub width: usize,
-    pub placement: ElementPlacement,
-    pub focus_number: f64,
-    pub style: FocusStyle,
-    pub on_press: ButtonHandler,
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ElementHeightMode {
+    Fixed(usize),
+    FitContent,
 }
 
-pub struct TextInputConfig {
-    pub width: usize,
-    pub placement: ElementPlacement,
-    pub focus_number: f64,
-    pub style: TextInputStyle,
+pub struct TextInputBehavior {
     pub locked: bool,
-    pub initial_text: String,
+    pub style: TextInputStyle,
 }
 
-pub struct TextDisplayConfig {
+pub struct ElementConfig {
     pub placement: ElementPlacement,
     pub width: usize,
-    pub height: usize,
+    pub height_mode: ElementHeightMode,
     pub focus_number: f64,
+    pub text: String,
     pub style: FocusStyle,
-    pub initial_text: String,
-}
-
-pub enum ElementConfig {
-    Button(ButtonConfig),
-    TextInput(TextInputConfig),
-    TextDisplay(TextDisplayConfig),
+    pub on_activate: Option<ElementHandler>,
+    pub text_input: Option<TextInputBehavior>,
 }
 
 pub(super) enum UiEvent {
@@ -65,28 +51,24 @@ pub(super) enum UiEvent {
     Quit,
 }
 
-pub type ButtonHandler = Box<dyn FnMut(&mut RuntimeUi) + 'static>;
+pub type ElementHandler = Box<dyn FnMut(&mut RuntimeUi) + 'static>;
 
-fn label_width(label: &str) -> usize {
-    label.chars().count().max(1)
-}
-
-impl ButtonConfig {
+impl ElementConfig {
     pub fn new(
-        label: impl Into<String>,
         placement: ElementPlacement,
+        width: usize,
         focus_number: f64,
         style: FocusStyle,
-        on_press: ButtonHandler,
     ) -> Self {
-        let label = label.into();
         Self {
-            width: label_width(&label),
-            label,
             placement,
+            width: width.max(1),
+            height_mode: ElementHeightMode::FitContent,
             focus_number,
+            text: String::new(),
             style,
-            on_press,
+            on_activate: None,
+            text_input: None,
         }
     }
 
@@ -94,96 +76,71 @@ impl ButtonConfig {
         self.width = width.max(1);
         self
     }
+
+    pub fn with_fixed_height(mut self, height: usize) -> Self {
+        self.height_mode = ElementHeightMode::Fixed(height.max(1));
+        self
+    }
+
+    pub fn with_fit_content_height(mut self) -> Self {
+        self.height_mode = ElementHeightMode::FitContent;
+        self
+    }
+
+    pub fn with_text(mut self, text: impl Into<String>) -> Self {
+        self.text = text.into();
+        self
+    }
+
+    pub fn with_on_activate(mut self, on_activate: ElementHandler) -> Self {
+        self.on_activate = Some(on_activate);
+        self
+    }
+
+    pub fn with_text_input(mut self, text_input: TextInputBehavior) -> Self {
+        self.text_input = Some(text_input);
+        self
+    }
 }
 
-impl TextInputConfig {
-    pub fn new(
-        width: usize,
-        placement: ElementPlacement,
-        focus_number: f64,
-        style: TextInputStyle,
-    ) -> Self {
+impl TextInputBehavior {
+    pub fn new(style: TextInputStyle) -> Self {
         Self {
-            width: width.max(1),
-            placement,
-            focus_number,
-            style,
             locked: false,
-            initial_text: String::new(),
+            style,
         }
     }
 
-    pub fn with_lock_status(mut self, locked: bool) -> Self {
+    pub fn with_locked(mut self, locked: bool) -> Self {
         self.locked = locked;
         self
     }
-
-    pub fn with_initial_text(mut self, initial_text: impl Into<String>) -> Self {
-        self.initial_text = initial_text.into();
-        self
-    }
 }
 
-impl TextDisplayConfig {
-    pub fn new(
-        placement: ElementPlacement,
-        width: usize,
-        height: usize,
-        focus_number: f64,
-        style: FocusStyle,
-        initial_text: impl Into<String>,
-    ) -> Self {
-        Self {
-            placement,
-            width: width.max(1),
-            height: height.max(1),
-            focus_number,
-            style,
-            initial_text: initial_text.into(),
-        }
-    }
-}
-
-pub(super) struct ButtonElement {
-    pub id: usize,
-    pub focus_number: f64,
-    pub placement: ElementPlacement,
-    pub button: Button,
-    pub style: FocusStyle,
-    pub on_press: Option<ButtonHandler>,
-}
-
-pub(super) struct TextInputElement {
-    pub id: usize,
-    pub focus_number: f64,
-    pub placement: ElementPlacement,
-    pub location: Location,
-    pub field: TextInputField,
+pub(super) struct RuntimeTextInput {
+    pub locked: bool,
     pub cursor: usize,
     pub selection_anchor: Option<usize>,
     pub style: TextInputStyle,
 }
 
-pub(super) struct TextDisplayRuntimeElement {
+pub(super) struct RuntimeElement {
     pub id: usize,
     pub focus_number: f64,
     pub placement: ElementPlacement,
     pub location: Location,
     pub width: usize,
-    pub height: usize,
+    pub height_mode: ElementHeightMode,
     pub scroll: usize,
-    pub display: TextDisplayElement,
+    pub text: String,
+    pub focused: bool,
     pub style: FocusStyle,
+    pub on_activate: Option<ElementHandler>,
+    pub text_input: Option<RuntimeTextInput>,
 }
 
-pub(super) enum RuntimeElement {
-    Button(ButtonElement),
-    TextInput(TextInputElement),
-    TextDisplay(TextDisplayRuntimeElement),
-}
-
-pub(crate) fn clamp_text_display_dimensions(width: usize, height: usize) -> (usize, usize) {
-    (width.max(1), height.max(1))
+pub(crate) fn clamp_fixed_height(height: usize) -> usize {
+    height.max(1)
 }
 
 pub(crate) fn text_input_state_from_parts(
@@ -198,102 +155,45 @@ pub(crate) fn text_input_state_from_parts(
     }
 }
 
-impl ButtonElement {
-    pub fn from_config(id: usize, config: ButtonConfig, location: Location) -> Self {
-        let ButtonConfig {
-            label,
-            width,
-            placement,
-            focus_number,
-            style,
-            on_press,
-        } = config;
-
-        Self {
-            id,
-            focus_number,
-            placement,
-            button: create_button(
-                location,
-                label,
-                width,
-                style.unfocused.bg,
-                style.unfocused.fg,
-                Box::new(|| {}),
-            ),
-            style,
-            on_press: Some(on_press),
-        }
-    }
-}
-
-impl TextInputElement {
-    pub fn from_config(id: usize, config: TextInputConfig, location: Location) -> Self {
-        let mut field = create_text_input_field_element(config.width);
-        field.locked = config.locked;
-        field.text = config.initial_text;
-
-        Self {
-            id,
-            focus_number: config.focus_number,
-            placement: config.placement,
-            location,
-            field,
-            cursor: 0,
-            selection_anchor: None,
-            style: config.style,
-        }
-    }
-}
-
-impl TextDisplayRuntimeElement {
-    pub fn from_config(id: usize, config: TextDisplayConfig, location: Location) -> Self {
-        let (width, height) = clamp_text_display_dimensions(config.width, config.height);
-        Self {
-            id,
-            focus_number: config.focus_number,
-            placement: config.placement,
-            location,
-            width,
-            height,
-            scroll: 0,
-            display: create_text_display_element(config.initial_text),
-            style: config.style,
-        }
-    }
-}
-
 impl RuntimeElement {
-    pub fn id(&self) -> usize {
-        match self {
-            RuntimeElement::Button(button) => button.id,
-            RuntimeElement::TextInput(input) => input.id,
-            RuntimeElement::TextDisplay(display) => display.id,
+    pub fn from_config(id: usize, config: ElementConfig, location: Location) -> Self {
+        Self {
+            id,
+            focus_number: config.focus_number,
+            placement: config.placement,
+            location,
+            width: config.width.max(1),
+            height_mode: config.height_mode,
+            scroll: 0,
+            text: config.text,
+            focused: false,
+            style: config.style,
+            on_activate: config.on_activate,
+            text_input: config.text_input.map(|behavior| RuntimeTextInput {
+                locked: behavior.locked,
+                cursor: 0,
+                selection_anchor: None,
+                style: behavior.style,
+            }),
         }
+    }
+
+    pub fn id(&self) -> usize {
+        self.id
     }
 
     pub fn focus_number(&self) -> f64 {
-        match self {
-            RuntimeElement::Button(button) => button.focus_number,
-            RuntimeElement::TextInput(input) => input.focus_number,
-            RuntimeElement::TextDisplay(display) => display.focus_number,
-        }
+        self.focus_number
     }
 
     pub fn set_focus_number(&mut self, focus_number: f64) {
-        match self {
-            RuntimeElement::Button(button) => button.focus_number = focus_number,
-            RuntimeElement::TextInput(input) => input.focus_number = focus_number,
-            RuntimeElement::TextDisplay(display) => display.focus_number = focus_number,
-        }
+        self.focus_number = focus_number;
     }
 
     pub fn text_input_state(&self) -> Option<TextInputState> {
-        let RuntimeElement::TextInput(input) = self else {
-            return None;
-        };
+        let input = self.text_input.as_ref()?;
         Some(text_input_state_from_parts(
-            input.field.text.clone(),
+            self.text.clone(),
             input.cursor,
             input.selection_anchor,
         ))

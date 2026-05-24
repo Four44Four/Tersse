@@ -5,19 +5,16 @@ use crate::pure::text_input;
 use crate::pure::text_wrap;
 use crate::terminal_input::TerminalKey;
 
-use super::types::{RuntimeElement, UiEvent};
+use super::types::UiEvent;
 use super::RuntimeUi;
 
 impl RuntimeUi {
     fn text_input_height_change(&mut self, id: crate::ElementId, before_text: &str) -> bool {
         let width = match self.element_by_id(id) {
-            Some(RuntimeElement::TextInput(input)) => input.field.width.max(1),
+            Some(element) if element.text_input.is_some() => element.width.max(1),
             _ => 1,
         };
-        let before = super::layout::render_height_for_text_input_text(
-            before_text,
-            width,
-        );
+        let before = super::layout::render_height_for_text_input_text(before_text, width);
         let after = self.text_input_render_height(id).unwrap_or(before);
         after != before
     }
@@ -38,13 +35,22 @@ impl RuntimeUi {
         let Some(id) = self.current_focused_id() else {
             return false;
         };
-        let Some(RuntimeElement::TextDisplay(_)) = self.element_by_id(id) else {
+        let Some(element) = self.element_by_id(id) else {
             return false;
         };
+        if element.text_input.is_some() {
+            return false;
+        }
+        if !matches!(
+            element.height_mode,
+            super::types::ElementHeightMode::Fixed(_)
+        ) {
+            return false;
+        }
 
         match key {
             TerminalKey::AltUp => {
-                let Some(RuntimeElement::TextDisplay(display)) = self.element_mut_by_id(id) else {
+                let Some(display) = self.element_mut_by_id(id) else {
                     return false;
                 };
                 if display.scroll == 0 {
@@ -55,24 +61,28 @@ impl RuntimeUi {
             }
             TerminalKey::AltDown => {
                 let (total, scroll, viewport_rows) = {
-                    let Some(RuntimeElement::TextDisplay(display)) = self.element_by_id(id) else {
+                    let Some(display) = self.element_by_id(id) else {
                         return false;
                     };
                     let width = display.width.max(1);
-                    let total = text_wrap::wrapped_line_count(&display.display.text, width);
+                    let total = text_wrap::wrapped_line_count(&display.text, width);
                     let scroll = display.scroll;
                     let (max_y, max_x) = self.win.get_max_yx();
+                    let height = match display.height_mode {
+                        super::types::ElementHeightMode::Fixed(height) => height.max(1),
+                        super::types::ElementHeightMode::FitContent => 1,
+                    };
                     let (_, viewport_h) = terminal_bounds::clip_rect(
                         display.location.x as i32,
                         self.scrolled_y(display.location.y as i32),
                         width as i32,
-                        display.height.max(1) as i32,
+                        height as i32,
                         max_x,
                         max_y,
                     );
                     (total, scroll, viewport_h.max(1) as usize)
                 };
-                let Some(RuntimeElement::TextDisplay(display)) = self.element_mut_by_id(id) else {
+                let Some(display) = self.element_mut_by_id(id) else {
                     return false;
                 };
                 display.scroll = scroll_view::scroll_line_down(scroll, total, viewport_rows);
@@ -86,13 +96,16 @@ impl RuntimeUi {
         let Some(id) = self.current_focused_id() else {
             return false;
         };
-        let Some(RuntimeElement::TextInput(input)) = self.element_by_id(id) else {
+        let Some(input) = self.element_by_id(id) else {
             return false;
         };
-        if input.field.locked {
+        let Some(text_input) = input.text_input.as_ref() else {
+            return false;
+        };
+        if text_input.locked {
             return false;
         }
-        let before_text = input.field.text.clone();
+        let before_text = input.text.clone();
         let state = self.text_input_state(id);
         if let Some(pasted) = text_input::paste_text(&state, paste) {
             self.apply_text_input_paste(id, pasted);
@@ -105,12 +118,15 @@ impl RuntimeUi {
         let Some(id) = self.current_focused_id() else {
             return false;
         };
-        let Some(RuntimeElement::TextInput(input)) = self.element_by_id(id) else {
+        let Some(input) = self.element_by_id(id) else {
             return false;
         };
-        let before_text = input.field.text.clone();
+        let Some(text_input_behavior) = input.text_input.as_ref() else {
+            return false;
+        };
+        let before_text = input.text.clone();
 
-        let locked = input.field.locked;
+        let locked = text_input_behavior.locked;
         if matches!(key, TerminalKey::Up | TerminalKey::Down) {
             match key {
                 TerminalKey::Up => self.focus_prev(),
@@ -177,18 +193,18 @@ impl RuntimeUi {
             return UiEvent::None;
         };
         let mut callback = {
-            let Some(RuntimeElement::Button(button)) = self.element_mut_by_id(id) else {
+            let Some(element) = self.element_mut_by_id(id) else {
                 return UiEvent::None;
             };
-            button.on_press.take()
+            element.on_activate.take()
         };
         if let Some(handler) = callback.as_mut() {
             handler(self);
         }
         if let Some(handler) = callback {
-            if let Some(RuntimeElement::Button(button)) = self.element_mut_by_id(id) {
-                if button.on_press.is_none() {
-                    button.on_press = Some(handler);
+            if let Some(element) = self.element_mut_by_id(id) {
+                if element.on_activate.is_none() {
+                    element.on_activate = Some(handler);
                 }
             }
         }

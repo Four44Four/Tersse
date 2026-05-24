@@ -1,7 +1,6 @@
 use crate::pure::focus_order;
 use crate::ElementId;
 
-use super::types::RuntimeElement;
 use super::RuntimeUi;
 
 impl RuntimeUi {
@@ -38,24 +37,16 @@ impl RuntimeUi {
     pub(super) fn restore_focus(&mut self, focused_id: Option<ElementId>) {
         let order = self.focus_order();
         let focused_internal = focused_id.map(|id| id.as_internal());
-        self.focused_position = focus_order::index_for_focused_id(
-            &order,
-            focused_internal,
-            self.focused_position,
-        );
+        self.focused_position =
+            focus_order::index_for_focused_id(&order, focused_internal, self.focused_position);
         self.sync_focus_flags();
     }
 
     pub(super) fn sync_focus_flags(&mut self) {
         let focused = self.current_focused_id();
         for element in self.elements.iter_mut() {
-            let is_focused =
-                focused == Some(ElementId::from_internal(element.id()));
-            match element {
-                RuntimeElement::Button(button) => button.button.focused = is_focused,
-                RuntimeElement::TextInput(input) => input.field.focused = is_focused,
-                RuntimeElement::TextDisplay(display) => display.display.focused = is_focused,
-            }
+            let is_focused = focused == Some(ElementId::from_internal(element.id()));
+            element.focused = is_focused;
         }
     }
 }

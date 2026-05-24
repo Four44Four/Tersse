@@ -56,7 +56,12 @@ impl<V> IndexedFocusStore<V> {
         self.elements.remove(&id)
     }
 
-    pub fn set_focus_number<F>(&mut self, id: usize, focus_number: f64, mut set_value_focus: F) -> bool
+    pub fn set_focus_number<F>(
+        &mut self,
+        id: usize,
+        focus_number: f64,
+        mut set_value_focus: F,
+    ) -> bool
     where
         F: FnMut(&mut V, f64),
     {

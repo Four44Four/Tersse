@@ -4,8 +4,7 @@ use crate::ElementId;
 use crate::Location;
 
 use super::types::{
-    ButtonConfig, ButtonElement, ElementConfig, RuntimeElement, TextDisplayConfig,
-    TextDisplayRuntimeElement, TextInputConfig, TextInputElement,
+    ElementConfig, ElementHandler, ElementHeightMode, RuntimeElement, TextInputBehavior,
 };
 use super::RuntimeUi;
 
@@ -23,70 +22,13 @@ impl RuntimeUi {
         ElementId::from_internal(self.allocate_element_id())
     }
 
-    pub fn create_button(&mut self, config: ButtonConfig) -> ElementId {
+    pub fn create_element(&mut self, config: ElementConfig) -> ElementId {
         let id = self.create_element_id();
         let focused_id = self.current_focused_id();
-        let (width, height) = Self::button_config_dimensions(&config);
+        let (width, height) = Self::element_config_dimensions(&config);
         let location =
             self.resolve_config_location(id.as_internal(), &config.placement, width, height);
-        let element = RuntimeElement::Button(ButtonElement::from_config(
-            id.as_internal(),
-            config,
-            location,
-        ));
-        self.elements.upsert(element);
-        self.recompute_all_relative_locations();
-        self.restore_focus(focused_id);
-        self.refresh_height_cache();
-        self.mark_element_and_below_changed(id);
-        id
-    }
-
-    pub fn update_button(&mut self, id: ElementId, config: ButtonConfig) -> bool {
-        let old_bounds = self.element_bounds(id);
-        if !self.elements.contains_id(id.as_internal()) {
-            return false;
-        }
-        let focused_id = self.current_focused_id();
-        let (width, height) = Self::button_config_dimensions(&config);
-        let location =
-            self.resolve_config_location(id.as_internal(), &config.placement, width, height);
-        let element = RuntimeElement::Button(ButtonElement::from_config(
-            id.as_internal(),
-            config,
-            location,
-        ));
-        self.elements.upsert(element);
-        self.recompute_all_relative_locations();
-        self.restore_focus(focused_id);
-        self.refresh_height_cache();
-        self.mark_from_y_changed(
-            old_bounds
-                .zip(self.element_bounds(id))
-                .map(|(old, new)| old.y.min(new.y))
-                .unwrap_or_default(),
-        );
-        true
-    }
-
-    pub fn button_width(&self, id: ElementId) -> Option<usize> {
-        match self.element_by_id(id) {
-            Some(RuntimeElement::Button(button)) => Some(button.button.width),
-            _ => None,
-        }
-    }
-
-    pub fn create_text_input(&mut self, config: TextInputConfig) -> ElementId {
-        let id = self.create_element_id();
-        let focused_id = self.current_focused_id();
-        let (width, height) = Self::text_input_config_dimensions(&config);
-        let location =
-            self.resolve_config_location(id.as_internal(), &config.placement, width, height);
-        let element = RuntimeElement::TextInput(TextInputElement::from_config(
-            id.as_internal(),
-            config,
-            location,
-        ));
+        let element = RuntimeElement::from_config(id.as_internal(), config, location);
         self.elements.upsert(element);
         self.recompute_all_relative_locations();
         self.restore_focus(focused_id);
@@ -96,70 +38,20 @@ impl RuntimeUi {
         id
     }
 
-    pub fn update_text_input(&mut self, id: ElementId, config: TextInputConfig) -> bool {
+    pub fn update_element(&mut self, id: ElementId, config: ElementConfig) -> bool {
         let old_bounds = self.element_bounds(id);
         if !self.elements.contains_id(id.as_internal()) {
             return false;
         }
         let focused_id = self.current_focused_id();
-        let (width, height) = Self::text_input_config_dimensions(&config);
+        let (width, height) = Self::element_config_dimensions(&config);
         let location =
             self.resolve_config_location(id.as_internal(), &config.placement, width, height);
-        let element = RuntimeElement::TextInput(TextInputElement::from_config(
-            id.as_internal(),
-            config,
-            location,
-        ));
+        let element = RuntimeElement::from_config(id.as_internal(), config, location);
         self.elements.upsert(element);
         self.recompute_all_relative_locations();
         self.restore_focus(focused_id);
         self.invalidate_text_input_layout_cache(id);
-        self.refresh_height_cache();
-        self.mark_from_y_changed(
-            old_bounds
-                .zip(self.element_bounds(id))
-                .map(|(old, new)| old.y.min(new.y))
-                .unwrap_or_default(),
-        );
-        true
-    }
-
-    pub fn create_text_display(&mut self, config: TextDisplayConfig) -> ElementId {
-        let id = self.create_element_id();
-        let focused_id = self.current_focused_id();
-        let (width, height) = Self::text_display_config_dimensions(&config);
-        let location =
-            self.resolve_config_location(id.as_internal(), &config.placement, width, height);
-        let element = RuntimeElement::TextDisplay(TextDisplayRuntimeElement::from_config(
-            id.as_internal(),
-            config,
-            location,
-        ));
-        self.elements.upsert(element);
-        self.recompute_all_relative_locations();
-        self.restore_focus(focused_id);
-        self.refresh_height_cache();
-        self.mark_element_and_below_changed(id);
-        id
-    }
-
-    pub fn update_text_display(&mut self, id: ElementId, config: TextDisplayConfig) -> bool {
-        let old_bounds = self.element_bounds(id);
-        if !self.elements.contains_id(id.as_internal()) {
-            return false;
-        }
-        let focused_id = self.current_focused_id();
-        let (width, height) = Self::text_display_config_dimensions(&config);
-        let location =
-            self.resolve_config_location(id.as_internal(), &config.placement, width, height);
-        let element = RuntimeElement::TextDisplay(TextDisplayRuntimeElement::from_config(
-            id.as_internal(),
-            config,
-            location,
-        ));
-        self.elements.upsert(element);
-        self.recompute_all_relative_locations();
-        self.restore_focus(focused_id);
         self.refresh_height_cache();
         self.mark_from_y_changed(
             old_bounds
@@ -171,11 +63,7 @@ impl RuntimeUi {
     }
 
     pub fn create_and_reflow(&mut self, config: ElementConfig) -> ElementId {
-        match config {
-            ElementConfig::Button(cfg) => self.create_button(cfg),
-            ElementConfig::TextInput(cfg) => self.create_text_input(cfg),
-            ElementConfig::TextDisplay(cfg) => self.create_text_display(cfg),
-        }
+        self.create_element(config)
     }
 
     pub fn remove_and_reflow(&mut self, id: ElementId) -> bool {
@@ -212,12 +100,7 @@ impl RuntimeUi {
     }
 
     pub fn element_location(&self, id: ElementId) -> Option<Location> {
-        match self.element_by_id(id) {
-            Some(RuntimeElement::Button(button)) => Some(button.button.location),
-            Some(RuntimeElement::TextInput(input)) => Some(input.location),
-            Some(RuntimeElement::TextDisplay(display)) => Some(display.location),
-            None => None,
-        }
+        self.element_by_id(id).map(|element| element.location)
     }
 
     pub fn set_focus_number(&mut self, id: ElementId, focus_number: f64) -> bool {
@@ -248,16 +131,22 @@ impl RuntimeUi {
         true
     }
 
-    pub fn set_text_display_dimensions(
+    pub fn set_element_dimensions(
         &mut self,
         id: ElementId,
         width: usize,
-        height: usize,
+        height_mode: ElementHeightMode,
     ) -> bool {
-        let anchor_y = self.element_location(id).map(|location| location.y).unwrap_or_default();
-        if let Some(RuntimeElement::TextDisplay(display)) = self.element_mut_by_id(id) {
-            display.width = width.max(1);
-            display.height = height.max(1);
+        let anchor_y = self
+            .element_location(id)
+            .map(|location| location.y)
+            .unwrap_or_default();
+        if let Some(element) = self.element_mut_by_id(id) {
+            element.width = width.max(1);
+            element.height_mode = match height_mode {
+                ElementHeightMode::Fixed(height) => ElementHeightMode::Fixed(height.max(1)),
+                ElementHeightMode::FitContent => ElementHeightMode::FitContent,
+            };
             self.recompute_all_relative_locations();
             self.mark_from_y_changed(anchor_y);
             true
@@ -266,36 +155,28 @@ impl RuntimeUi {
         }
     }
 
-    pub fn set_text_display_text(&mut self, id: ElementId, text: impl Into<String>) -> bool {
-        if let Some(RuntimeElement::TextDisplay(display)) = self.element_mut_by_id(id) {
-            display.display.text = text.into();
-            display.scroll = 0;
-            self.mark_element_only_changed(id);
-            true
-        } else {
-            false
-        }
+    pub fn read_element_text(&self, id: ElementId) -> Option<String> {
+        self.element_by_id(id).map(|element| element.text.clone())
     }
 
-    pub fn read_text_input(&self, id: ElementId) -> Option<String> {
-        match self.element_by_id(id) {
-            Some(RuntimeElement::TextInput(input)) => Some(input.field.text.clone()),
-            _ => None,
-        }
-    }
-
-    pub fn set_text_input_text(&mut self, id: ElementId, text: impl Into<String>) -> bool {
-        let Some(old_height) = self.text_input_render_height(id) else {
+    pub fn set_element_text(&mut self, id: ElementId, text: impl Into<String>) -> bool {
+        let Some(old_height) = self.element_render_height_by_id(id) else {
             return false;
         };
-        let anchor_y = self.element_location(id).map(|location| location.y).unwrap_or_default();
-        if let Some(RuntimeElement::TextInput(input)) = self.element_mut_by_id(id) {
-            input.field.text = text.into();
-            input.cursor = input.field.text.chars().count();
-            input.selection_anchor = None;
+        let anchor_y = self
+            .element_location(id)
+            .map(|location| location.y)
+            .unwrap_or_default();
+        if let Some(element) = self.element_mut_by_id(id) {
+            element.text = text.into();
+            if let Some(input) = element.text_input.as_mut() {
+                input.cursor = element.text.chars().count();
+                input.selection_anchor = None;
+            }
+            element.scroll = 0;
             self.invalidate_text_input_layout_cache(id);
             self.recompute_all_relative_locations();
-            let new_height = self.text_input_render_height(id).unwrap_or(old_height);
+            let new_height = self.element_render_height_by_id(id).unwrap_or(old_height);
             if old_height != new_height {
                 self.mark_from_y_changed(anchor_y);
             } else {
@@ -307,11 +188,35 @@ impl RuntimeUi {
         }
     }
 
-    pub fn set_text_input_lock_status(&mut self, id: ElementId, locked: bool) -> bool {
-        if let Some(RuntimeElement::TextInput(input)) = self.element_mut_by_id(id) {
-            input.field.locked = locked;
+    pub fn set_element_text_input_behavior(
+        &mut self,
+        id: ElementId,
+        behavior: Option<TextInputBehavior>,
+    ) -> bool {
+        if let Some(element) = self.element_mut_by_id(id) {
+            element.text_input = behavior.map(|next| super::types::RuntimeTextInput {
+                locked: next.locked,
+                cursor: element.text.chars().count(),
+                selection_anchor: None,
+                style: next.style,
+            });
+            self.invalidate_text_input_layout_cache(id);
+            self.recompute_all_relative_locations();
+            self.mark_element_and_below_changed(id);
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn set_element_lock_status(&mut self, id: ElementId, locked: bool) -> bool {
+        if let Some(element) = self.element_mut_by_id(id) {
+            let Some(text_input) = element.text_input.as_mut() else {
+                return false;
+            };
+            text_input.locked = locked;
             if locked {
-                input.selection_anchor = None;
+                text_input.selection_anchor = None;
             }
             self.mark_element_only_changed(id);
             true
@@ -320,11 +225,42 @@ impl RuntimeUi {
         }
     }
 
+    pub fn set_element_on_activate(
+        &mut self,
+        id: ElementId,
+        on_activate: Option<ElementHandler>,
+    ) -> bool {
+        if let Some(element) = self.element_mut_by_id(id) {
+            element.on_activate = on_activate;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn element_width(&self, id: ElementId) -> Option<usize> {
+        self.element_by_id(id).map(|element| element.width)
+    }
+
+    pub fn element_has_text_input(&self, id: ElementId) -> bool {
+        self.element_by_id(id)
+            .is_some_and(|element| element.text_input.is_some())
+    }
+
     pub(super) fn element_by_id(&self, id: ElementId) -> Option<&RuntimeElement> {
         self.elements.get(id.as_internal())
     }
 
     pub(super) fn element_mut_by_id(&mut self, id: ElementId) -> Option<&mut RuntimeElement> {
         self.elements.get_mut(id.as_internal())
+    }
+
+    fn element_render_height_by_id(&mut self, id: ElementId) -> Option<usize> {
+        if self.element_by_id(id)?.text_input.is_some() {
+            self.text_input_render_height(id)
+        } else {
+            let element = self.element_by_id(id)?;
+            Some(self.element_render_height(element))
+        }
     }
 }

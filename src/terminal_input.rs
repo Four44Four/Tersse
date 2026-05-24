@@ -3,8 +3,7 @@
 use crate::pure::keyboard::arrow_extend_selection;
 use crossterm::event::{
     DisableBracketedPaste, EnableBracketedPaste, Event, EventStream, KeyCode, KeyEvent,
-    KeyEventKind,
-    KeyModifiers,
+    KeyEventKind, KeyModifiers,
 };
 use crossterm::execute;
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode, size};
@@ -119,7 +118,9 @@ fn map_key_event(key: KeyEvent) -> Option<TerminalKey> {
             extend_selection: extend,
         }),
         KeyCode::Up if key.modifiers.contains(KeyModifiers::SHIFT) => Some(TerminalKey::ShiftUp),
-        KeyCode::Down if key.modifiers.contains(KeyModifiers::SHIFT) => Some(TerminalKey::ShiftDown),
+        KeyCode::Down if key.modifiers.contains(KeyModifiers::SHIFT) => {
+            Some(TerminalKey::ShiftDown)
+        }
         KeyCode::Up if key.modifiers.contains(KeyModifiers::ALT) => Some(TerminalKey::AltUp),
         KeyCode::Down if key.modifiers.contains(KeyModifiers::ALT) => Some(TerminalKey::AltDown),
         KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
