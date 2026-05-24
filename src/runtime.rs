@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use ahash::AHashMap;
 use std::time::Instant;
 
 use pancurses::Window;
@@ -93,11 +93,11 @@ pub struct RuntimeUi {
     title: Option<ScreenTitle>,
     elements: ElementStore,
     focused_position: usize,
-    pair_cache: HashMap<(i16, i16), i16>,
+    pair_cache: AHashMap<(i16, i16), i16>,
     next_pair_id: i16,
     next_element_id: usize,
-    cached_heights: HashMap<usize, usize>,
-    text_input_layout_cache: HashMap<usize, TextInputLayoutCache>,
+    cached_heights: AHashMap<usize, usize>,
+    text_input_layout_cache: AHashMap<usize, TextInputLayoutCache>,
     resize_debounce_until: Option<Instant>,
     redraw_debounce_until: Option<Instant>,
     last_terminal_yx: Option<(i32, i32)>,

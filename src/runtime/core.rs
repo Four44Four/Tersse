@@ -1,3 +1,4 @@
+use ahash::AHashMap;
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
 use std::time::Instant;
@@ -114,11 +115,11 @@ impl RuntimeUi {
             title: None,
             elements: ElementStore::new(),
             focused_position: 0,
-            pair_cache: std::collections::HashMap::new(),
+            pair_cache: AHashMap::new(),
             next_pair_id: 1,
             next_element_id: 0,
-            cached_heights: std::collections::HashMap::new(),
-            text_input_layout_cache: std::collections::HashMap::new(),
+            cached_heights: AHashMap::new(),
+            text_input_layout_cache: AHashMap::new(),
             resize_debounce_until: None,
             redraw_debounce_until: None,
             last_terminal_yx: None,

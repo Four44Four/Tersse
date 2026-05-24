@@ -1,4 +1,6 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
+
+use ahash::AHashMap;
 
 use tersse::pure::focus_key::FocusKey;
 use tersse::pure::focus_store::{btree_get, btree_rekey, btree_remove, btree_upsert};
@@ -6,7 +8,7 @@ use tersse::pure::focus_store::{btree_get, btree_rekey, btree_remove, btree_upse
 #[test]
 fn btree_upsert_remove_and_rekey_are_logarithmic_map_ops() {
     let mut by_key: BTreeMap<FocusKey, &'static str> = BTreeMap::new();
-    let mut id_to_key: HashMap<usize, FocusKey> = HashMap::new();
+    let mut id_to_key: AHashMap<usize, FocusKey> = AHashMap::new();
 
     btree_upsert(
         &mut by_key,

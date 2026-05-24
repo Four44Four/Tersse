@@ -1,14 +1,16 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
+
+use ahash::AHashMap;
 
 use super::focus_key::FocusKey;
 
 /// Shared element/focus-index storage:
-/// - O(1) average id access via HashMap
+/// - O(1) average id access via AHashMap
 /// - O(log n) ordered traversal via BTreeMap keyed by `(focus_number, id)`
 pub struct IndexedFocusStore<V> {
-    elements: HashMap<usize, V>,
+    elements: AHashMap<usize, V>,
     by_key: BTreeMap<FocusKey, usize>,
-    id_to_key: HashMap<usize, FocusKey>,
+    id_to_key: AHashMap<usize, FocusKey>,
 }
 
 impl<V> Default for IndexedFocusStore<V> {
@@ -20,9 +22,9 @@ impl<V> Default for IndexedFocusStore<V> {
 impl<V> IndexedFocusStore<V> {
     pub fn new() -> Self {
         Self {
-            elements: HashMap::new(),
+            elements: AHashMap::new(),
             by_key: BTreeMap::new(),
-            id_to_key: HashMap::new(),
+            id_to_key: AHashMap::new(),
         }
     }
 
@@ -96,7 +98,7 @@ impl<V> IndexedFocusStore<V> {
 /// Inserts or replaces an element keyed by `(focus_number, id)` in `O(log n)` time.
 pub fn btree_upsert<V>(
     by_key: &mut BTreeMap<FocusKey, V>,
-    id_to_key: &mut HashMap<usize, FocusKey>,
+    id_to_key: &mut AHashMap<usize, FocusKey>,
     key: FocusKey,
     value: V,
 ) {
@@ -110,7 +112,7 @@ pub fn btree_upsert<V>(
 /// Removes an element by id in `O(log n)` time.
 pub fn btree_remove<V>(
     by_key: &mut BTreeMap<FocusKey, V>,
-    id_to_key: &mut HashMap<usize, FocusKey>,
+    id_to_key: &mut AHashMap<usize, FocusKey>,
     id: usize,
 ) -> Option<V> {
     let key = id_to_key.remove(&id)?;
@@ -120,7 +122,7 @@ pub fn btree_remove<V>(
 /// Moves an element to a new `focus_number` in `O(log n)` time.
 pub fn btree_rekey<V>(
     by_key: &mut BTreeMap<FocusKey, V>,
-    id_to_key: &mut HashMap<usize, FocusKey>,
+    id_to_key: &mut AHashMap<usize, FocusKey>,
     id: usize,
     new_focus_number: f64,
 ) -> bool {
@@ -143,7 +145,7 @@ pub fn btree_rekey<V>(
 /// Looks up a value by id in `O(log n)` time.
 pub fn btree_get<'a, V>(
     by_key: &'a BTreeMap<FocusKey, V>,
-    id_to_key: &HashMap<usize, FocusKey>,
+    id_to_key: &AHashMap<usize, FocusKey>,
     id: usize,
 ) -> Option<&'a V> {
     let key = id_to_key.get(&id)?;
@@ -153,7 +155,7 @@ pub fn btree_get<'a, V>(
 /// Looks up a mutable value by id in `O(log n)` time.
 pub fn btree_get_mut<'a, V>(
     by_key: &'a mut BTreeMap<FocusKey, V>,
-    id_to_key: &HashMap<usize, FocusKey>,
+    id_to_key: &AHashMap<usize, FocusKey>,
     id: usize,
 ) -> Option<&'a mut V> {
     let key = id_to_key.get(&id)?.clone();
