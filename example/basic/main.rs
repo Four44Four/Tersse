@@ -109,6 +109,7 @@ impl App {
                 Box::new(move |ui| {
                     app.borrow_mut().as_mut().unwrap().handle_clear(ui);
                 }),
+                None,
             )));
         }
 
@@ -204,6 +205,7 @@ fn main() {
                 &foo_session,
             );
         }),
+        Some(5)
     ));
 
     let bar_app = Rc::clone(&app);
@@ -220,6 +222,7 @@ fn main() {
                 &bar_session,
             );
         }),
+        Some(5)
     ));
 
     let mung_session = session.clone();
@@ -237,6 +240,7 @@ fn main() {
         Box::new(move |_ui| {
             mung_session.send_message(format!("{}What ?", random_base64_chars(5)));
         }),
+        Some(5)
     ));
 
     let input_id = ui.create_element(
@@ -262,6 +266,7 @@ fn main() {
                 .unwrap()
                 .handle_press(ui, Rc::clone(&press_app));
         }),
+        None,
     ));
 
     app.borrow_mut()
@@ -280,10 +285,11 @@ fn button_element(
     placement: ElementPlacement,
     focus_number: f64,
     on_activate: ElementHandler,
+    width: Option<usize>
 ) -> ElementConfig {
     ElementConfig::new(
         placement,
-        5,
+        width.unwrap_or(label.chars().count().max(1)),
         focus_number,
         button_style(),
     )
