@@ -1,8 +1,4 @@
 # Sprint 1
- - Use aHash for element storage hashing
- - Ensure that only the thread that started the application can update the UI
-    - (all updates to UI MUST be synchronized to original UI instance's thread)
-    - Write tests for this behavior
  - Message gutter
  - Message screen
  - Help screen

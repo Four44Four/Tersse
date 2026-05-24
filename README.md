@@ -27,3 +27,10 @@
     - Option: Render diffs made on disk
  - *File renderer
     - Option: Render diffs made on disk
+
+# Constraints
+ - When creating a new TUI element:
+    - It must be created on the same thread that the TUI was created on
+    - Or, it must be created within a queued update for the TUI
+       - All queued updates will automatically run in the context of the TUI's thread
+    - Violating this will result in internal TUI state variables experiencing race conditions and data corruption
