@@ -1,6 +1,0 @@
- - Has all properties of TUI elements
- - Solid color background and text of different colors
- - When Space or Enter key is pressed when a button is focused:
-    - Run some callback
- - When a button is focused:
-    - It should display an alternate background and foreground color

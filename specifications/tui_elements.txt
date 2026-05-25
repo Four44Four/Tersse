@@ -3,6 +3,7 @@
     - Fixed width
     - Solid bg color
     - Text display with fg color
+    - Alternate sets of bg and fg colors when focused
     - Can have fixed height and is scrollable by Alt/Meta + Up/Down keys when focused OR can have height that always conforms to text wrapped height
        - Fixed height will cause all text that overflows the element to be hidden
           - Scrolling with Alt/Meta + Up/Down keys when focused will hide the top most line and reveal the next hidden line until the end of the element is scrolled to
