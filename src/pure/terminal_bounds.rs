@@ -5,12 +5,12 @@ pub fn content_max_y(terminal_max_y: i32) -> i32 {
     (terminal_max_y - 1).max(0)
 }
 
-/// Columns visible from `x` through `max_x` inclusive.
+/// Columns visible from `x` while reserving the rightmost terminal column.
 pub fn cols_visible_from(x: i32, max_x: i32) -> i32 {
     if x > max_x {
         0
     } else {
-        max_x - x + 1
+        (max_x - x).max(0)
     }
 }
 
@@ -31,8 +31,7 @@ pub fn rows_visible_from(y: i32, terminal_max_y: i32) -> i32 {
 
 /// Max characters that can be written on `row_y` without ncurses auto-wrap.
 ///
-/// The lower-right cell `(max_y, max_x)` cannot receive output, so the bottom
-/// usable row allows one fewer column than other rows.
+/// The rightmost terminal column is reserved on all usable rows.
 
 /// Line indices `[start, end)` within an element that intersect visible terminal rows.
 pub fn visible_element_line_range(
@@ -60,13 +59,10 @@ pub fn row_is_visible(row_y: i32, terminal_max_y: i32) -> bool {
 }
 
 pub fn cols_for_printing(x: i32, max_x: i32, row_y: i32, terminal_max_y: i32) -> i32 {
-    let max_y = content_max_y(terminal_max_y);
     if x > max_x || !row_is_visible(row_y, terminal_max_y) {
         0
-    } else if row_y == max_y {
-        (max_x - x).max(0)
     } else {
-        max_x - x + 1
+        (max_x - x).max(0)
     }
 }
 

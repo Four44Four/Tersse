@@ -17,7 +17,7 @@ pub enum MsgGutterSide {
 pub const MSG_GUTTER_BG_COLOR: Color = Color::Black;
 
 /// Screen edge where the message gutter is drawn.
-pub const MSG_GUTTER_SIDE: MsgGutterSide = MsgGutterSide::Bottom;
+pub const MSG_GUTTER_SIDE: MsgGutterSide = MsgGutterSide::Top;
 
 /// Maximum number of terminal rows the message gutter may occupy.
 pub const MSG_GUTTER_MAX_HEIGHT: usize = 5;

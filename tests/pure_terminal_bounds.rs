@@ -33,8 +33,8 @@ fn visible_element_line_range_matches_viewport() {
 
 #[test]
 fn clip_rect_at_bottom_right() {
-    assert_eq!(clip_rect(0, 20, 80, 12, 79, 23), (80, 3));
-    assert_eq!(clip_rect(70, 22, 20, 5, 79, 23), (10, 1));
+    assert_eq!(clip_rect(0, 20, 80, 12, 79, 23), (79, 3));
+    assert_eq!(clip_rect(70, 22, 20, 5, 79, 23), (9, 1));
 }
 
 #[test]
@@ -49,7 +49,7 @@ fn clip_str_respects_cols() {
 
 #[test]
 fn cols_for_printing_bottom_row() {
-    assert_eq!(cols_for_printing(0, 79, 21, 23), 80);
+    assert_eq!(cols_for_printing(0, 79, 21, 23), 79);
     assert_eq!(cols_for_printing(0, 79, 22, 23), 79);
     assert_eq!(cols_for_printing(0, 79, 23, 23), 0);
 }
@@ -64,10 +64,10 @@ fn row_is_visible_within_terminal() {
 
 #[test]
 fn max_element_row_cols_respects_width_and_terminal_edges() {
-    assert_eq!(max_element_row_cols(0, 79, 21, 23, 80), 80);
+    assert_eq!(max_element_row_cols(0, 79, 21, 23, 80), 79);
     assert_eq!(max_element_row_cols(0, 79, 22, 23, 80), 79);
     assert_eq!(max_element_row_cols(0, 79, 22, 23, 20), 20);
-    assert_eq!(max_element_row_cols(75, 79, 21, 23, 20), 5);
+    assert_eq!(max_element_row_cols(75, 79, 21, 23, 20), 4);
     assert_eq!(max_element_row_cols(75, 79, 22, 23, 20), 4);
 }
 
