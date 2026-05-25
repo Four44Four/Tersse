@@ -1,5 +1,8 @@
  - Whenever an element is added/created or removed, has its position changed, has its dimensions changed, or otherwise would cause a reflow/shifting of positions of other elements:
     - Redraw that element and all elements below it
+ - Whenever an element is removed:
+    - Clear the space that the element occupied
+    - Then redraw appropriate elements
  - Whenever the focused element changes:
     - Redraw the previously focused element and the newly focused element
  - Whenever an element's properties (text display, colors, etc...) changes without changing its position or size (no reflow is caused):

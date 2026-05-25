@@ -203,16 +203,8 @@ impl RuntimeUi {
         let screen_scroll_changed = is_fit_height && self.screen_scroll != screen_scroll_before;
         let height_changed =
             layout_height_changed || self.text_input_height_changed(id, before_text);
-        if screen_scroll_changed {
-            self.redraw_after_screen_scroll();
-        } else if height_changed {
+        if screen_scroll_changed || height_changed {
             if let Some(anchor_y) = self.element_location(id).map(|location| location.y) {
-                let logical_rows = self
-                    .cached_heights
-                    .get(&id.as_internal())
-                    .copied()
-                    .unwrap_or(1);
-                self.clear_text_input_visible_rows(anchor_y, logical_rows);
                 self.clear_rows_from(anchor_y);
             }
             self.redraw_text_input_and_below(id);
@@ -634,21 +626,35 @@ impl RuntimeUi {
         self.win.refresh();
     }
 
-    /// Clears terminal rows where a fit-height text input's visible lines are drawn.
-    fn clear_text_input_visible_rows(&self, anchor_y: u16, logical_rows: usize) {
+    /// Clears all terminal cells within an element's bounds.
+    pub(super) fn clear_element_occupied_space(
+        &self,
+        bounds: crate::pure::element_placement::ElementBounds,
+    ) {
+        if bounds.height == 0 {
+            return;
+        }
         let (max_y, max_x) = self.win.get_max_yx();
-        let y = self.scrolled_y(anchor_y as i32);
-        let rows = terminal_bounds::visible_element_line_range(y, logical_rows as i32, max_y);
-        for line_idx in rows {
+        let x = bounds.x as i32;
+        let y = self.scrolled_y(bounds.y as i32);
+        let row_range =
+            terminal_bounds::visible_element_line_range(y, bounds.height as i32, max_y);
+        for line_idx in row_range {
             let row_y = y + line_idx;
             if !terminal_bounds::row_is_visible(row_y, max_y)
                 || self.is_message_gutter_screen_row(row_y)
             {
                 continue;
             }
-            self.win.mv(row_y, 0);
-            let cols = self.cols_for_printing_respecting_message_gutter(0, max_x, row_y, max_y);
-            for _ in 0..cols {
+            let cols = terminal_bounds::max_element_row_cols(
+                x,
+                max_x,
+                row_y,
+                max_y,
+                bounds.width as i32,
+            );
+            for col in 0..cols {
+                self.win.mv(row_y, x + col);
                 self.win.addch(' ');
             }
         }

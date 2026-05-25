@@ -8,6 +8,7 @@ use tokio::runtime::Handle;
 use tokio::sync::oneshot;
 
 use crate::pure::message_gutter::MessageGutterState;
+use crate::pure::terminal_input_batch::PendingPasteBuffer;
 use crate::terminal_input;
 use crate::terminal_input::{TerminalKey, TerminalPoll};
 
@@ -92,18 +93,6 @@ async fn run_async_driver(
                 }
             }
         }
-    }
-}
-
-fn coalesced_text_char_from_key(key: TerminalKey, has_pending_text: bool) -> Option<char> {
-    match key {
-        TerminalKey::Char(c) if !c.is_control() || c == '\t' => Some(c),
-        // Keep standalone key semantics; only fold whitespace/newline keys into an active
-        // text run so paste-like bursts remain a single insertion.
-        TerminalKey::Tab if has_pending_text => Some('\t'),
-        TerminalKey::Space if has_pending_text => Some(' '),
-        TerminalKey::Enter if has_pending_text => Some('\n'),
-        _ => None,
     }
 }
 
@@ -257,14 +246,12 @@ impl RuntimeUi {
 
         let mut ui_event = UiEvent::None;
         let mut full_immediate = false;
-        let mut pending_text = String::new();
+        let mut pending_text = PendingPasteBuffer::new();
 
-        let flush_pending_text = |ui: &mut Self, pending: &mut String| {
-            if pending.is_empty() {
-                return;
+        let flush_pending_text = |ui: &mut Self, pending: &mut PendingPasteBuffer| {
+            if let Some(paste) = pending.flush_before_boundary() {
+                let _ = ui.handle_text_input_terminal_paste(&paste);
             }
-            let _ = ui.handle_text_input_terminal_paste(pending);
-            pending.clear();
         };
 
         for poll in batch {
@@ -275,14 +262,8 @@ impl RuntimeUi {
                     self.drain_ui_queue();
                     let _ = self.flush_pending_redraw();
                 }
-                TerminalPoll::Paste(paste) => pending_text.push_str(&paste),
+                TerminalPoll::Paste(paste) => pending_text.push_paste(&paste),
                 TerminalPoll::Key(key) => {
-                    if let Some(c) =
-                        coalesced_text_char_from_key(key, !pending_text.is_empty())
-                    {
-                        pending_text.push(c);
-                        continue;
-                    }
                     flush_pending_text(self, &mut pending_text);
                     let previous = self.current_focused_id();
                     let (ev, imm) = self.handle_key(key);

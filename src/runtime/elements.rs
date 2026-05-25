@@ -84,14 +84,15 @@ impl RuntimeUi {
     }
 
     pub fn remove_element(&mut self, id: ElementId) -> bool {
-        let old_y = self.element_location(id).map(|location| location.y);
+        let removed_bounds = self.element_bounds(id);
         let focused_id = self.current_focused_id();
         if self.elements.remove(id.as_internal()).is_some() {
             self.restore_focus(focused_id);
             self.cached_heights.remove(&id.as_internal());
             self.invalidate_text_input_layout_cache(id);
-            if let Some(y) = old_y {
-                self.mark_from_y_changed(y);
+            if let Some(bounds) = removed_bounds {
+                self.clear_element_occupied_space(bounds);
+                self.mark_from_y_changed(bounds.y);
             }
             true
         } else {
