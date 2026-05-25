@@ -142,6 +142,14 @@ impl RuntimeUi {
         if !self.message_gutter.visible && self.message_gutter_expires_at.is_none() {
             return;
         }
+        let (max_y, _) = self.win.get_max_yx();
+        let gutter_height = self.message_gutter.rendered_height;
+        let rows_to_restore = if gutter_height > 0 {
+            gutter_screen_rows(MSG_GUTTER_SIDE, gutter_height, max_y)
+        } else {
+            0..0
+        };
+
         self.message_gutter = message_gutter::hide_message(&self.message_gutter);
         self.message_gutter_expires_at = None;
         self.message_gutter_reveal_scroll_cap = None;
@@ -156,8 +164,6 @@ impl RuntimeUi {
                     // Future scroll-up ratchets this cap down.
                     self.message_gutter_reveal_scroll_cap = Some(self.screen_scroll);
                 }
-                self.draw();
-                return;
             }
             crate::constants::MsgGutterSide::Top => {
                 self.message_gutter.rendered_height = 0;
@@ -166,10 +172,14 @@ impl RuntimeUi {
                 } else if self.screen_scroll_up_reveal > 0 {
                     self.message_gutter_reveal_scroll_cap = Some(self.screen_scroll_up_reveal);
                 }
-                self.draw();
-                return;
             }
         }
+
+        if !rows_to_restore.is_empty() {
+            self.restore_screen_rows(rows_to_restore);
+        }
+        self.fill_scroll_padding_rows();
+        self.win.refresh();
     }
 
     pub(super) fn message_gutter_layout_height(&self) -> usize {
