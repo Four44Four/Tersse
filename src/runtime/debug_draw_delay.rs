@@ -7,7 +7,6 @@ use crate::Color;
 use super::layout::{
     render_height_for_button, render_height_for_text_display, render_height_for_text_input_text,
 };
-use super::types::{ElementHeightMode, RuntimeElement};
 use super::RuntimeUi;
 
 impl RuntimeUi {

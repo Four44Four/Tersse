@@ -13,6 +13,7 @@ pub mod resize_debounce;
 pub mod screen_scroll;
 pub mod scroll_view;
 pub mod terminal_bounds;
+pub mod terminal_poll_coalesce;
 pub mod text_input;
 pub mod text_wrap;
 pub mod ui_redraw;

@@ -34,6 +34,9 @@ pub const MSG_GUTTER_MULTI_MSG_COLOR: Color = Color::Cyan;
 /// Milliseconds to wait between UI session queue update driven element redraws.
 pub const UI_REDRAW_DEBOUNCE_QUEUE_UPDATE_MS: u64 = 20;
 
+/// Idle gap that ends a terminal input burst when coalescing paste/key runs.
+pub const TERMINAL_POLL_COALESCE_IDLE_MS: u64 = 2;
+
 /// Debug placeholder fill color for existing-element draw/redraw visualization.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[allow(dead_code)]

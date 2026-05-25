@@ -265,6 +265,11 @@ fn sanitize_paste(paste: &str) -> String {
         .collect()
 }
 
+/// Insert a string at the cursor (replaces any active selection).
+pub fn insert_text(state: &TextInputState, text: &str) -> Option<TextInputState> {
+    paste_text(state, text)
+}
+
 /// Insert clipboard text at the cursor (replaces any active selection).
 pub fn paste_text(state: &TextInputState, paste: &str) -> Option<TextInputState> {
     let base = if state.has_selection() {

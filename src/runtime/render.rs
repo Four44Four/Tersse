@@ -175,6 +175,20 @@ impl RuntimeUi {
         self.win.refresh();
     }
 
+    pub(super) fn commit_text_input_redraw(&mut self, id: ElementId, before_text: &str) {
+        self.text_input_redraw_committed = true;
+        self.sync_text_input_scroll_for_cursor(id);
+        if self.text_input_height_changed(id, before_text) {
+            if let Some(anchor_y) = self.element_location(id).map(|location| location.y) {
+                self.clear_rows_from(anchor_y);
+            }
+            self.redraw_text_input_and_below(id);
+        } else {
+            self.redraw_keyboard_current_element(Some(id));
+        }
+        self.clear_pending_queue_redraw();
+    }
+
     pub(super) fn redraw_text_input_and_below(&mut self, id: ElementId) {
         self.auto_reflow_for_dynamic_heights();
         self.clamp_screen_scroll_offset();

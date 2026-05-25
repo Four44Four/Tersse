@@ -106,6 +106,8 @@ pub struct RuntimeUi {
     ui_queue_redraw_plan: crate::pure::ui_redraw::ElementRedrawPlan,
     draining_ui_queue: bool,
     sync_layout_redraw_pending: bool,
+    /// Set when a text-input edit path already drew and refreshed the terminal.
+    text_input_redraw_committed: bool,
     message_gutter: MessageGutterState,
     message_gutter_expires_at: Option<Instant>,
 }

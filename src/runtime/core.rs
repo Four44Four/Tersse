@@ -78,10 +78,10 @@ async fn run_async_driver(
     loop {
         tokio::select! {
             _ = &mut shutdown => break,
-            event = terminal_input::read_terminal_event(&mut stream) => {
+            event = terminal_input::read_terminal_poll_batch(&mut stream) => {
                 match event {
-                    Ok(Some(event)) => {
-                        if signal_tx.send(ui_session::UiSignal::Terminal(event)).is_err() {
+                    Ok(Some(batch)) => {
+                        if signal_tx.send(ui_session::UiSignal::Terminal(batch)).is_err() {
                             break;
                         }
                     }
@@ -132,6 +132,7 @@ impl RuntimeUi {
             ui_queue_redraw_plan: crate::pure::ui_redraw::ElementRedrawPlan::default(),
             draining_ui_queue: false,
             sync_layout_redraw_pending: false,
+            text_input_redraw_committed: false,
             message_gutter: MessageGutterState::default(),
             message_gutter_expires_at: None,
         };
@@ -220,44 +221,79 @@ impl RuntimeUi {
                 self.finish_non_keyboard_redraw();
                 UiEvent::None
             }
-            ui_session::UiSignal::Terminal(event) => self.handle_terminal_poll(event),
+            ui_session::UiSignal::Terminal(batch) => self.handle_terminal_poll_batch(batch),
             ui_session::UiSignal::TerminalError => UiEvent::Quit,
         }
     }
 
-    fn handle_terminal_poll(&mut self, event: TerminalPoll) -> UiEvent {
-        let keyboard_input = matches!(&event, TerminalPoll::Paste(_) | TerminalPoll::Key(_));
+    fn recv_terminal_poll_batch(&self, first: Vec<TerminalPoll>) -> Vec<TerminalPoll> {
+        let mut batch = first;
+        while let Ok(ui_session::UiSignal::Terminal(more)) = self.ui_signal_rx.try_recv() {
+            batch.extend(more);
+        }
+        terminal_input::coalesce_terminal_poll_batch(batch)
+    }
+
+    fn handle_terminal_poll_batch(&mut self, batch: Vec<TerminalPoll>) -> UiEvent {
+        let batch = self.recv_terminal_poll_batch(batch);
+        if batch.is_empty() {
+            return UiEvent::None;
+        }
+
+        let keyboard_input = batch.iter().any(|poll| {
+            matches!(poll, TerminalPoll::Paste(_) | TerminalPoll::Key(_))
+        });
         if keyboard_input {
+            self.text_input_redraw_committed = false;
             self.flush_pending_queue_redraw_for_keyboard();
         }
-        match event {
-            TerminalPoll::Resized { .. } => {
-                self.note_terminal_resize();
-                self.drain_ui_queue();
-                let _ = self.flush_pending_redraw();
-                UiEvent::None
+
+        let mut ui_event = UiEvent::None;
+        let mut full_immediate = false;
+        let mut pending_text = String::new();
+
+        let flush_pending_text = |ui: &mut Self, pending: &mut String| {
+            if pending.is_empty() {
+                return;
             }
-            TerminalPoll::Paste(paste) => {
-                let current = self.current_focused_id();
-                let _ = self.handle_text_input_paste(&paste);
-                self.redraw_keyboard_current_element(current);
-                self.finish_terminal_input_redraw(false);
-                UiEvent::None
-            }
-            TerminalPoll::Key(key) => {
-                let previous = self.current_focused_id();
-                let (ui_event, full_immediate) = self.handle_key(key);
-                if matches!(ui_event, UiEvent::Quit) {
-                    return ui_event;
+            let _ = ui.handle_text_input_terminal_paste(pending);
+            pending.clear();
+        };
+
+        for poll in batch {
+            match poll {
+                TerminalPoll::Resized { .. } => {
+                    flush_pending_text(self, &mut pending_text);
+                    self.note_terminal_resize();
+                    self.drain_ui_queue();
+                    let _ = self.flush_pending_redraw();
                 }
-                let current = self.current_focused_id();
-                if !full_immediate {
-                    self.redraw_keyboard_focused_elements(previous, current);
+                TerminalPoll::Paste(paste) => pending_text.push_str(&paste),
+                TerminalPoll::Key(key) => {
+                    flush_pending_text(self, &mut pending_text);
+                    let previous = self.current_focused_id();
+                    let (ev, imm) = self.handle_key(key);
+                    full_immediate |= imm;
+                    if matches!(ev, UiEvent::Quit) {
+                        return ev;
+                    }
+                    ui_event = ev;
+                    let current = self.current_focused_id();
+                    if !full_immediate && !self.text_input_redraw_committed {
+                        self.redraw_keyboard_focused_elements(previous, current);
+                    }
                 }
-                self.finish_terminal_input_redraw(full_immediate);
-                ui_event
             }
         }
+
+        flush_pending_text(self, &mut pending_text);
+
+        if !self.text_input_redraw_committed {
+            self.finish_terminal_input_redraw(full_immediate);
+        } else if full_immediate {
+            self.finish_terminal_input_redraw(true);
+        }
+        ui_event
     }
 
     fn handle_key(&mut self, key: TerminalKey) -> (UiEvent, bool) {

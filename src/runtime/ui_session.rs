@@ -12,7 +12,8 @@ pub(crate) type UiSignalReceiver = mpsc::Receiver<UiSignal>;
 
 pub(crate) enum UiSignal {
     QueueUpdated,
-    Terminal(TerminalPoll),
+    /// One or more terminal polls read in a single burst (coalesced when possible).
+    Terminal(Vec<TerminalPoll>),
     TerminalError,
 }
 

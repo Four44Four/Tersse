@@ -1,6 +1,8 @@
 //! Crossterm raw-mode keyboard input (cross-platform, including Shift+arrow modifiers).
 
+use crate::constants::TERMINAL_POLL_COALESCE_IDLE_MS;
 use crate::pure::keyboard::arrow_extend_selection;
+use std::time::Duration;
 use crossterm::event::{
     DisableBracketedPaste, EnableBracketedPaste, Event, EventStream, KeyCode, KeyEvent,
     KeyEventKind, KeyModifiers,
@@ -80,22 +82,135 @@ pub fn terminal_event_stream() -> EventStream {
 /// Returns `Ok(None)` when the stream ends.
 pub async fn read_terminal_event(stream: &mut EventStream) -> io::Result<Option<TerminalPoll>> {
     while let Some(event) = stream.next().await {
-        let event = event.map_err(io::Error::other)?;
-        match event {
-            Event::Key(key) => {
-                if let Some(key) = map_key_event(key) {
-                    return Ok(Some(TerminalPoll::Key(key)));
-                }
-                continue;
-            }
-            Event::Paste(paste) => return Ok(Some(TerminalPoll::Paste(paste))),
-            Event::Resize(cols, rows) => {
-                return Ok(Some(TerminalPoll::Resized { cols, rows }));
-            }
-            _ => continue,
+        if let Some(poll) = map_crossterm_event(event.map_err(io::Error::other)?)? {
+            return Ok(Some(poll));
         }
     }
     Ok(None)
+}
+
+/// Reads one blocking event, then drains any immediately available events and coalesces text runs.
+///
+/// Terminals without bracketed paste (notably Windows WinAPI input) deliver pasted text as a
+/// burst of key events; merging them here yields a single [`TerminalPoll::Paste`] per burst.
+pub async fn read_terminal_poll_batch(stream: &mut EventStream) -> io::Result<Option<Vec<TerminalPoll>>> {
+    let Some(first) = read_terminal_event(stream).await? else {
+        return Ok(None);
+    };
+    let mut batch = vec![first];
+    let idle = Duration::from_millis(TERMINAL_POLL_COALESCE_IDLE_MS);
+    loop {
+        match tokio::time::timeout(idle, read_terminal_event(stream)).await {
+            Ok(Ok(Some(poll))) => batch.push(poll),
+            Ok(Ok(None)) => break,
+            Ok(Err(err)) => return Err(err),
+            Err(_) => break,
+        }
+    }
+    Ok(Some(coalesce_terminal_poll_batch(batch)))
+}
+
+pub(crate) fn coalesce_terminal_poll_batch(batch: Vec<TerminalPoll>) -> Vec<TerminalPoll> {
+    let mut out = Vec::new();
+    let mut text = String::new();
+
+    let flush = |out: &mut Vec<TerminalPoll>, text: &mut String| {
+        if !text.is_empty() {
+            out.push(TerminalPoll::Paste(std::mem::take(text)));
+        }
+    };
+
+    for poll in batch {
+        match poll {
+            TerminalPoll::Paste(s) => text.push_str(&s),
+            TerminalPoll::Key(TerminalKey::Char(c)) if coalesce_text_char(c) => text.push(c),
+            // Space/Enter/Tab mid-paste are part of a Windows paste burst; alone they are key presses.
+            TerminalPoll::Key(TerminalKey::Tab) if !text.is_empty() => text.push('\t'),
+            TerminalPoll::Key(TerminalKey::Space) if !text.is_empty() => text.push(' '),
+            TerminalPoll::Key(TerminalKey::Enter) if !text.is_empty() => text.push('\n'),
+            other => {
+                flush(&mut out, &mut text);
+                out.push(other);
+            }
+        }
+    }
+    flush(&mut out, &mut text);
+    out
+}
+
+fn coalesce_text_char(c: char) -> bool {
+    !c.is_control() || c == '\t'
+}
+
+fn map_crossterm_event(event: Event) -> io::Result<Option<TerminalPoll>> {
+    Ok(match event {
+        Event::Key(key) => map_key_event(key).map(TerminalPoll::Key),
+        Event::Paste(paste) => Some(TerminalPoll::Paste(paste)),
+        Event::Resize(cols, rows) => Some(TerminalPoll::Resized { cols, rows }),
+        _ => None,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn coalesce_char_burst_into_single_paste() {
+        let batch = vec![
+            TerminalPoll::Key(TerminalKey::Char('a')),
+            TerminalPoll::Key(TerminalKey::Char('b')),
+            TerminalPoll::Key(TerminalKey::Char('c')),
+        ];
+        assert_eq!(
+            coalesce_terminal_poll_batch(batch),
+            vec![TerminalPoll::Paste("abc".to_string())]
+        );
+    }
+
+    #[test]
+    fn coalesce_preserves_non_text_keys() {
+        let batch = vec![
+            TerminalPoll::Key(TerminalKey::Char('a')),
+            TerminalPoll::Key(TerminalKey::Left {
+                extend_selection: false,
+            }),
+        ];
+        assert_eq!(
+            coalesce_terminal_poll_batch(batch),
+            vec![
+                TerminalPoll::Paste("a".to_string()),
+                TerminalPoll::Key(TerminalKey::Left {
+                    extend_selection: false,
+                }),
+            ]
+        );
+    }
+
+    #[test]
+    fn coalesce_keeps_standalone_space_and_enter_as_keys() {
+        assert_eq!(
+            coalesce_terminal_poll_batch(vec![TerminalPoll::Key(TerminalKey::Space)]),
+            vec![TerminalPoll::Key(TerminalKey::Space)]
+        );
+        assert_eq!(
+            coalesce_terminal_poll_batch(vec![TerminalPoll::Key(TerminalKey::Enter)]),
+            vec![TerminalPoll::Key(TerminalKey::Enter)]
+        );
+    }
+
+    #[test]
+    fn coalesce_enter_after_chars_as_paste_newline() {
+        let batch = vec![
+            TerminalPoll::Key(TerminalKey::Char('a')),
+            TerminalPoll::Key(TerminalKey::Enter),
+            TerminalPoll::Key(TerminalKey::Char('b')),
+        ];
+        assert_eq!(
+            coalesce_terminal_poll_batch(batch),
+            vec![TerminalPoll::Paste("a\nb".to_string())]
+        );
+    }
 }
 
 fn map_key_event(key: KeyEvent) -> Option<TerminalKey> {
