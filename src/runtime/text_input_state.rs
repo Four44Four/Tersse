@@ -80,23 +80,32 @@ impl RuntimeUi {
         }
     }
 
-    /// Scrolls the document so the bottom of a growing fit-height text field stays reachable.
-    pub(super) fn sync_screen_scroll_for_text_input_growth(&mut self, id: ElementId) {
-        let Some(element) = self.element_by_id(id) else {
-            return;
+    /// Scrolls the document so the typing cursor row stays on-screen (top or bottom edge).
+    pub(super) fn sync_screen_scroll_for_text_input_cursor(&mut self, id: ElementId) {
+        let (anchor_y, cursor, text, width) = {
+            let Some(element) = self.element_by_id(id) else {
+                return;
+            };
+            let Some(input) = element.text_input.as_ref() else {
+                return;
+            };
+            (
+                element.location.y,
+                input.cursor,
+                element.text.clone(),
+                element.width.max(1),
+            )
         };
-        if element.fixed_viewport_height().is_some() || element.text_input.is_none() {
-            return;
-        }
-        let width = element.width.max(1);
-        let line_count = text_wrap::display_row_count(&element.text, width);
-        let bottom_row = element.location.y as usize + line_count.saturating_sub(1);
+        let (line, _) = text_wrap::cursor_display_position(&text, cursor, width);
+        let cursor_row = anchor_y as usize + line;
         let (_, viewport) = self.screen_scroll_bounds();
         let (content_height, _) = self.full_screen_scroll_bounds();
-        self.screen_scroll = screen_scroll::screen_scroll_to_show_row(
-            bottom_row,
+        self.screen_scroll = screen_scroll::screen_scroll_to_show_cursor_row(
+            cursor_row,
+            self.screen_scroll,
             content_height,
             viewport,
+            self.screen_scroll_up_reveal as i32,
         );
     }
 
@@ -117,7 +126,7 @@ impl RuntimeUi {
         let layout_height_changed =
             matches!((cached_height_before, cached_height_after), (Some(b), Some(a)) if b != a);
         // Screen scroll first so in-field scroll uses the correct on-screen row count.
-        self.sync_screen_scroll_for_text_input_growth(id);
+        self.sync_screen_scroll_for_text_input_cursor(id);
         self.sync_text_input_scroll_for_cursor(id);
         (is_fit_height, layout_height_changed)
     }

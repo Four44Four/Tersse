@@ -1,6 +1,6 @@
 use tersse::pure::screen_scroll::{
-    apply_scroll_to_y, clamp_screen_scroll, screen_content_height, screen_scroll_to_show_row,
-    screen_viewport_height, scroll_screen_down, scroll_screen_up,
+    apply_scroll_to_y, clamp_screen_scroll, screen_content_height, screen_scroll_to_show_cursor_row,
+    screen_scroll_to_show_row, screen_viewport_height, scroll_screen_down, scroll_screen_up,
 };
 
 #[test]
@@ -43,4 +43,21 @@ fn screen_scroll_to_show_row_keeps_focus_inside_viewport() {
 fn screen_scroll_to_show_row_keeps_element_bottom_on_screen() {
     // Input at y=4 with 25 lines ends at row 28; viewport 24 -> scroll 5.
     assert_eq!(screen_scroll_to_show_row(28, 30, 24), 5);
+}
+
+#[test]
+fn screen_scroll_to_show_cursor_row_leaves_scroll_when_visible() {
+    assert_eq!(screen_scroll_to_show_cursor_row(10, 5, 30, 24, 0), 5);
+    assert_eq!(screen_scroll_to_show_cursor_row(23, 0, 30, 24, 0), 0);
+}
+
+#[test]
+fn screen_scroll_to_show_cursor_row_pins_below_viewport_to_bottom() {
+    assert_eq!(screen_scroll_to_show_cursor_row(24, 0, 30, 24, 0), 1);
+    assert_eq!(screen_scroll_to_show_cursor_row(29, 0, 30, 24, 0), 6);
+}
+
+#[test]
+fn screen_scroll_to_show_cursor_row_pins_above_viewport_to_top() {
+    assert_eq!(screen_scroll_to_show_cursor_row(5, 10, 30, 24, 0), 5);
 }

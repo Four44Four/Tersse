@@ -54,3 +54,31 @@ pub fn screen_scroll_to_show_row(
         viewport_height,
     )
 }
+
+/// Screen-scroll offset that keeps `cursor_row` visible, leaving `current_scroll` unchanged
+/// when the row is already on-screen.
+///
+/// When the cursor is above the viewport it is pinned to the top row; when below, to the
+/// bottom row. `viewport_shift` is added to the on-screen row (e.g. upward gutter reveal).
+pub fn screen_scroll_to_show_cursor_row(
+    cursor_row: usize,
+    current_scroll: usize,
+    content_height: usize,
+    viewport_height: usize,
+    viewport_shift: i32,
+) -> usize {
+    if viewport_height == 0 {
+        return current_scroll;
+    }
+    let last_visible = viewport_height.saturating_sub(1) as i32;
+    let screen_row = cursor_row as i32 - current_scroll as i32 + viewport_shift;
+    if (0..=last_visible).contains(&screen_row) {
+        return current_scroll;
+    }
+    let target = if screen_row < 0 {
+        (cursor_row as i32 + viewport_shift).max(0) as usize
+    } else {
+        (cursor_row as i32 + viewport_shift - last_visible).max(0) as usize
+    };
+    clamp_screen_scroll(target, content_height, viewport_height)
+}

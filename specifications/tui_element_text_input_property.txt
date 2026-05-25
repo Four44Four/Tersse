@@ -57,3 +57,9 @@
  - When text is inserted or pasted into the element:
     - Insert all text within 1 redraw of the element
     - Element should not repeatedly redraw with chunks of text copied in
+ - When input is made on a text input element AND the typing cursor is outside of the bounds of the terminal screen:
+    - Move the scroll position so that the line where the typing cursor is currently at is visible
+    - If the cursor is below the bottom of the screen:
+       - Move the scroll position so that the line where the typing cursor is currently at is at the bottom line of the screen
+    - If the cursor is above the top of the screen:
+       - Move the scroll position so that the line where the typing cursor is currently at is at the top line of the screen
