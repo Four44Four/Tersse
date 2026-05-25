@@ -17,3 +17,6 @@
  - Miniscreens
  - Text input gap buffer
  - Intra-element colorizing
+
+# Sprint 4
+ - C compatibility support
