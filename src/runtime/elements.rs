@@ -6,9 +6,9 @@ use crate::Location;
 use super::types::{
     ElementConfig, ElementHandler, ElementHeightMode, RuntimeElement, TextInputBehavior,
 };
-use super::RuntimeUi;
+use super::TersseUi;
 
-impl RuntimeUi {
+impl TersseUi {
     fn allocate_element_id(&mut self) -> usize {
         loop {
             let id = allocate_element_id(&mut self.next_element_id);

@@ -25,7 +25,7 @@ struct App {
 }
 
 impl App {
-    fn handle_foo(&mut self, ui: &mut RuntimeUi) {
+    fn handle_foo(&mut self, ui: &mut TersseUi) {
         if let Some(boo_id) = self.boo_id.take() {
             let _ = ui.remove_and_reflow(boo_id);
             return;
@@ -44,9 +44,9 @@ impl App {
         )));
     }
 
-    fn handle_submit(&self, ui: &mut RuntimeUi, session: &UiSession) {
+    fn handle_submit(&self, ui: &mut TersseUi, task_queuer: &UiTaskQueuer) {
         let message = ui.read_element_text(self.input_id).unwrap_or_default();
-        session.send_message(message);
+        task_queuer.send_message(message);
     }
 }
 
@@ -59,8 +59,8 @@ fn main() {
     let (cols, _rows) = terminal_size().unwrap_or((80, 24));
     let app: Rc<RefCell<Option<App>>> = Rc::new(RefCell::new(None));
 
-    let mut ui = RuntimeUi::new();
-    let session = ui.ui_session();
+    let mut ui = TersseUi::new();
+    let task_queuer = ui.ui_task_queuer();
 
     let title_id = ui.create_element(static_text_display_unfocusable_fit_width(
         ElementPlacement::absolute(Location {
@@ -107,7 +107,7 @@ fn main() {
     ));
 
     let submit_app = Rc::clone(&app);
-    let submit_session = session.clone();
+    let submit_task_queuer = task_queuer.clone();
     let _submit_id = ui.create_element(button_fit_width(
         ElementPlacement::relative_to(input_id, ParentSide::Bottom, Location::default()),
         BUTTON_HEIGHT,
@@ -119,7 +119,7 @@ fn main() {
                 .borrow()
                 .as_ref()
                 .unwrap()
-                .handle_submit(ui, &submit_session);
+                .handle_submit(ui, &submit_task_queuer);
         }),
     ));
 

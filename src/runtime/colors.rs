@@ -1,8 +1,8 @@
 use crate::Color;
 
-use super::RuntimeUi;
+use super::TersseUi;
 
-impl RuntimeUi {
+impl TersseUi {
     pub(super) fn color_pair(&mut self, fg: Color, bg: Color) -> i16 {
         let fg_code = terminal_color_code(fg);
         let bg_code = terminal_color_code(bg);

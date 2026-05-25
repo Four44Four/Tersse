@@ -6,14 +6,14 @@ use crate::constants::TERM_RESIZE_DEBOUNCE_MS;
 use crate::pure::resize_debounce;
 use crate::terminal_input;
 
-use super::RuntimeUi;
+use super::TersseUi;
 
-impl RuntimeUi {
+impl TersseUi {
     /// Registers a callback to run on the UI thread after a debounced terminal resize
     /// when the terminal dimensions change. Not invoked for the initial size sync at startup.
     pub fn register_terminal_resize_callback(
         &mut self,
-        callback: impl FnMut(&mut RuntimeUi) + 'static,
+        callback: impl FnMut(&mut TersseUi) + 'static,
     ) {
         self.terminal_resize_callbacks.push(Box::new(callback));
     }

@@ -9,9 +9,9 @@ use super::layout::{
     render_height_for_button, render_height_for_text_display, render_height_for_text_input_text,
 };
 use super::types::{ElementConfig, ElementHeightMode, RuntimeElement};
-use super::RuntimeUi;
+use super::TersseUi;
 
-impl RuntimeUi {
+impl TersseUi {
     pub(super) fn resolve_config_location(
         &mut self,
         id: usize,

@@ -5,9 +5,9 @@ use crate::pure::text_input::TextInputState;
 use crate::pure::text_wrap;
 use crate::ElementId;
 
-use super::RuntimeUi;
+use super::TersseUi;
 
-impl RuntimeUi {
+impl TersseUi {
     /// Terminal rows currently visible for a fit-height text field (0 when fully off-screen).
     ///
     /// Excludes message-gutter rows so in-field scroll matches drawable rows.

@@ -7,9 +7,9 @@ use crate::Color;
 use super::layout::{
     render_height_for_button, render_height_for_text_display, render_height_for_text_input_text,
 };
-use super::RuntimeUi;
+use super::TersseUi;
 
-impl RuntimeUi {
+impl TersseUi {
     pub(super) fn debug_before_draw_message_gutter(
         &mut self,
         screen_y: i32,

@@ -31,7 +31,7 @@ pub const MSG_GUTTER_MULTI_MSG_STR: &str = "[+]";
 /// Foreground color for [`MSG_GUTTER_MULTI_MSG_STR`].
 pub const MSG_GUTTER_MULTI_MSG_COLOR: Color = Color::Cyan;
 
-/// Milliseconds to wait between UI session queue update driven element redraws.
+/// Milliseconds to wait between UI task queue update driven element redraws.
 pub const UI_REDRAW_DEBOUNCE_QUEUE_UPDATE_MS: u64 = 20;
 
 /// Idle gap that ends a terminal input burst when coalescing paste/key runs.
@@ -44,7 +44,7 @@ pub enum DebugDrawDelayColor {
     Red,
 }
 
-/// When `true`, element draw/redraw paths (including fullscreen [`RuntimeUi::draw`])
+/// When `true`, element draw/redraw paths (including fullscreen [`TersseUi::draw`])
 /// show a solid placeholder rectangle before drawing the real element.
 ///
 /// Enabled by the `debug_should_draw_do_delay` Cargo feature.

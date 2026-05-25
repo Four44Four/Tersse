@@ -5,9 +5,9 @@ use crate::pure::text_wrap;
 use crate::terminal_input::TerminalKey;
 
 use super::types::UiEvent;
-use super::RuntimeUi;
+use super::TersseUi;
 
-impl RuntimeUi {
+impl TersseUi {
     pub(super) fn text_input_height_changed(
         &mut self,
         id: crate::ElementId,

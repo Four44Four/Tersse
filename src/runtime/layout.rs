@@ -3,7 +3,7 @@ use crate::pure::text_wrap;
 use crate::ElementId;
 
 use super::types::RuntimeElement;
-use super::{RuntimeUi, TextInputLayoutCache};
+use super::{TersseUi, TextInputLayoutCache};
 
 pub(crate) fn render_height_for_button() -> usize {
     1
@@ -17,7 +17,7 @@ pub(crate) fn render_height_for_text_display(height: usize) -> usize {
     height.max(1)
 }
 
-impl RuntimeUi {
+impl TersseUi {
     pub(super) fn auto_reflow_for_dynamic_heights(&mut self) {
         let dynamic_ids = self
             .elements

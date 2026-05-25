@@ -3,9 +3,9 @@ use crate::pure::message_gutter;
 use crate::pure::screen_scroll;
 use crate::terminal_input::TerminalKey;
 
-use super::RuntimeUi;
+use super::TersseUi;
 
-impl RuntimeUi {
+impl TersseUi {
     pub(super) fn handle_screen_scroll(&mut self, key: TerminalKey) -> bool {
         let (_, viewport_height) = self.screen_scroll_bounds();
         let (base_content_height, full_viewport) = self.full_screen_scroll_bounds();

@@ -1,4 +1,4 @@
-//! Runtime pending-paste buffer (mirrors `RuntimeUi::pending_text`).
+//! Runtime pending-paste buffer (mirrors `TersseUi::pending_text`).
 
 /// Accumulates paste chunks until a boundary or batch end, matching runtime `pending_text`.
 #[derive(Debug, Default)]

@@ -14,8 +14,8 @@ use crate::terminal_input::{TerminalKey, TerminalPoll};
 
 use super::element_store::ElementStore;
 use super::types::UiEvent;
-use super::ui_session::{self, UiSession};
-use super::RuntimeUi;
+use super::ui_task_queuer::{self, UiTaskQueuer};
+use super::TersseUi;
 
 /// Owns a current-thread Tokio runtime on a dedicated background thread.
 ///
@@ -28,7 +28,7 @@ pub(super) struct AsyncRuntimeDriver {
 }
 
 impl AsyncRuntimeDriver {
-    pub fn start(signal_tx: ui_session::UiSignalSender) -> Self {
+    pub fn start(signal_tx: ui_task_queuer::UiSignalSender) -> Self {
         let (ready_tx, ready_rx) = std::sync::mpsc::sync_channel(1);
         let (shutdown_tx, shutdown_rx) = oneshot::channel();
 
@@ -71,7 +71,7 @@ impl Drop for AsyncRuntimeDriver {
 }
 
 async fn run_async_driver(
-    signal_tx: ui_session::UiSignalSender,
+    signal_tx: ui_task_queuer::UiSignalSender,
     mut shutdown: oneshot::Receiver<()>,
 ) {
     let mut stream = terminal_input::terminal_event_stream();
@@ -81,13 +81,13 @@ async fn run_async_driver(
             event = terminal_input::read_terminal_poll_batch(&mut stream) => {
                 match event {
                     Ok(Some(batch)) => {
-                        if signal_tx.send(ui_session::UiSignal::Terminal(batch)).is_err() {
+                        if signal_tx.send(ui_task_queuer::UiSignal::Terminal(batch)).is_err() {
                             break;
                         }
                     }
                     Ok(None) => break,
                     Err(_) => {
-                        let _ = signal_tx.send(ui_session::UiSignal::TerminalError);
+                        let _ = signal_tx.send(ui_task_queuer::UiSignal::TerminalError);
                         break;
                     }
                 }
@@ -96,7 +96,7 @@ async fn run_async_driver(
     }
 }
 
-impl RuntimeUi {
+impl TersseUi {
     pub fn new() -> Self {
         let _ = terminal_input::enter_raw_mode();
         let win = initscr();
@@ -105,8 +105,8 @@ impl RuntimeUi {
         pancurses::start_color();
         pancurses::use_default_colors();
 
-        let ui_queue = ui_session::new_ui_queue();
-        let (ui_signal_tx, ui_signal_rx) = ui_session::new_ui_signal_channel();
+        let ui_queue = ui_task_queuer::new_ui_queue();
+        let (ui_signal_tx, ui_signal_rx) = ui_task_queuer::new_ui_signal_channel();
         let async_driver = AsyncRuntimeDriver::start(ui_signal_tx.clone());
 
         let mut ui = Self {
@@ -144,20 +144,20 @@ impl RuntimeUi {
     }
 
     /// Returns a cloneable handle for queueing UI updates from other threads.
-    pub fn ui_session(&self) -> UiSession {
-        UiSession::new(Arc::clone(&self.ui_queue), self.ui_signal_tx.clone())
+    pub fn ui_task_queuer(&self) -> UiTaskQueuer {
+        UiTaskQueuer::new(Arc::clone(&self.ui_queue), self.ui_signal_tx.clone())
     }
 
     /// Returns a cloneable handle to the shared Tokio runtime.
     ///
     /// Use this to spawn async background tasks without creating a separate runtime.
-    pub fn runtime(&self) -> super::UiRuntime {
+    pub fn async_engine(&self) -> super::UiAsyncEngine {
         let handle = self
             .async_driver
             .as_ref()
             .expect("async runtime missing")
             .handle();
-        super::UiRuntime::new(handle)
+        super::UiAsyncEngine::new(handle)
     }
 
     /// Runs the UI event loop until the user quits.
@@ -181,25 +181,25 @@ impl RuntimeUi {
 
         let quit = if self.ui_queue_has_pending() {
             matches!(
-                self.process_signal(ui_session::UiSignal::QueueUpdated),
+                self.process_signal(ui_task_queuer::UiSignal::QueueUpdated),
                 UiEvent::Quit
             )
         } else if let Some(signal) = self.wait_for_signal() {
             matches!(self.process_signal(signal), UiEvent::Quit)
         } else {
             matches!(
-                self.process_signal(ui_session::UiSignal::QueueUpdated),
+                self.process_signal(ui_task_queuer::UiSignal::QueueUpdated),
                 UiEvent::Quit
             )
         };
         !quit
     }
 
-    fn wait_for_signal(&self) -> Option<ui_session::UiSignal> {
+    fn wait_for_signal(&self) -> Option<ui_task_queuer::UiSignal> {
         if let Some(until) = self.next_debounce_deadline() {
             let now = Instant::now();
             if now >= until {
-                return Some(ui_session::UiSignal::QueueUpdated);
+                return Some(ui_task_queuer::UiSignal::QueueUpdated);
             }
             let timeout = until.saturating_duration_since(now);
             self.ui_signal_rx.recv_timeout(timeout).ok()
@@ -208,22 +208,22 @@ impl RuntimeUi {
         }
     }
 
-    fn process_signal(&mut self, signal: ui_session::UiSignal) -> UiEvent {
+    fn process_signal(&mut self, signal: ui_task_queuer::UiSignal) -> UiEvent {
         match signal {
-            ui_session::UiSignal::QueueUpdated => {
+            ui_task_queuer::UiSignal::QueueUpdated => {
                 self.drain_ui_queue();
                 self.tick_message_gutter_expiry();
                 self.finish_non_keyboard_redraw();
                 UiEvent::None
             }
-            ui_session::UiSignal::Terminal(batch) => self.handle_terminal_poll_batch(batch),
-            ui_session::UiSignal::TerminalError => UiEvent::Quit,
+            ui_task_queuer::UiSignal::Terminal(batch) => self.handle_terminal_poll_batch(batch),
+            ui_task_queuer::UiSignal::TerminalError => UiEvent::Quit,
         }
     }
 
     fn recv_terminal_poll_batch(&self, first: Vec<TerminalPoll>) -> Vec<TerminalPoll> {
         let mut batch = first;
-        while let Ok(ui_session::UiSignal::Terminal(more)) = self.ui_signal_rx.try_recv() {
+        while let Ok(ui_task_queuer::UiSignal::Terminal(more)) = self.ui_signal_rx.try_recv() {
             batch.extend(more);
         }
         terminal_input::coalesce_terminal_poll_batch(batch)
@@ -320,7 +320,7 @@ impl RuntimeUi {
     }
 }
 
-impl Drop for RuntimeUi {
+impl Drop for TersseUi {
     fn drop(&mut self) {
         let _ = self.async_driver.take();
         let _ = curs_set(1);

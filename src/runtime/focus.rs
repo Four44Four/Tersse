@@ -1,9 +1,9 @@
 use crate::pure::focus_order;
 use crate::ElementId;
 
-use super::RuntimeUi;
+use super::TersseUi;
 
-impl RuntimeUi {
+impl TersseUi {
     pub(super) fn focus_next(&mut self) {
         let order = self.focus_order();
         if order.is_empty() {

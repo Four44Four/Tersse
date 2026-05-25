@@ -1,7 +1,7 @@
 use crate::pure::text_input::TextInputState;
 use crate::{Color, ElementPlacement, Location};
 
-use super::RuntimeUi;
+use super::TersseUi;
 
 #[derive(Clone, Copy)]
 pub struct Style {
@@ -52,10 +52,10 @@ pub(super) enum UiEvent {
     Quit,
 }
 
-pub type ElementHandler = Box<dyn FnMut(&mut RuntimeUi) + 'static>;
+pub type ElementHandler = Box<dyn FnMut(&mut TersseUi) + 'static>;
 
 /// Callback invoked on the UI thread after a debounced terminal resize when dimensions change.
-pub type TerminalResizeHandler = Box<dyn FnMut(&mut RuntimeUi) + 'static>;
+pub type TerminalResizeHandler = Box<dyn FnMut(&mut TersseUi) + 'static>;
 
 /// Focus order key assigned to elements that cannot receive keyboard focus.
 pub(crate) const UNFOCUSABLE_FOCUS_NUMBER: f64 = f64::INFINITY;

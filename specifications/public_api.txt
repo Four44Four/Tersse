@@ -10,4 +10,4 @@
     - Should be thread-safe
        - Can call from async or multi-threaded environments
  - Expose terminal_size() for reading the current terminal dimensions
- - Expose register_terminal_resize_callback on RuntimeUi to register callbacks that run on the UI thread after a debounced terminal resize when dimensions change (not on initial startup sync)
+ - Expose register_terminal_resize_callback on TersseUi to register callbacks that run on the UI thread after a debounced terminal resize when dimensions change (not on initial startup sync)

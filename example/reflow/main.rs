@@ -53,7 +53,12 @@ impl App {
         }
     }
 
-    fn handle_foo(&mut self, ui: &mut RuntimeUi, runtime: UiRuntime, session: &UiSession) {
+    fn handle_foo(
+        &mut self,
+        ui: &mut TersseUi,
+        async_engine: UiAsyncEngine,
+        task_queuer: &UiTaskQueuer,
+    ) {
         self.foo_flash.take().inspect(|task| task.abort());
         let id = self.upsert_flash_display(
             ui,
@@ -64,14 +69,19 @@ impl App {
         );
         *self.foo_text_id.lock().unwrap() = Some(id);
         self.foo_flash = Some(schedule_flash_removal(
-            runtime,
-            session.clone(),
+            async_engine,
+            task_queuer.clone(),
             Arc::clone(&self.foo_text_id),
             FLASH_FOO,
         ));
     }
 
-    fn handle_bar(&mut self, ui: &mut RuntimeUi, runtime: UiRuntime, session: &UiSession) {
+    fn handle_bar(
+        &mut self,
+        ui: &mut TersseUi,
+        async_engine: UiAsyncEngine,
+        task_queuer: &UiTaskQueuer,
+    ) {
         self.bar_flash.take().inspect(|task| task.abort());
         let id = self.upsert_flash_display(
             ui,
@@ -82,14 +92,14 @@ impl App {
         );
         *self.bar_text_id.lock().unwrap() = Some(id);
         self.bar_flash = Some(schedule_flash_removal(
-            runtime,
-            session.clone(),
+            async_engine,
+            task_queuer.clone(),
             Arc::clone(&self.bar_text_id),
             FLASH_BAR,
         ));
     }
 
-    fn handle_press(&mut self, ui: &mut RuntimeUi, app: Rc<RefCell<Option<App>>>) {
+    fn handle_press(&mut self, ui: &mut TersseUi, app: Rc<RefCell<Option<App>>>) {
         let input = ui.read_element_text(self.input_id).unwrap_or_default();
         let result = build_result_text(&input);
         let _ = ui.set_element_lock_status(self.input_id, true);
@@ -134,7 +144,7 @@ impl App {
         }
     }
 
-    fn handle_clear(&mut self, ui: &mut RuntimeUi) {
+    fn handle_clear(&mut self, ui: &mut TersseUi) {
         if let Some(result_id) = self.result_id.take() {
             let _ = ui.remove_and_reflow(result_id);
         }
@@ -147,7 +157,7 @@ impl App {
 
     fn upsert_flash_display(
         &self,
-        ui: &mut RuntimeUi,
+        ui: &mut TersseUi,
         button_id: ElementId,
         display_id: Option<ElementId>,
         focus_number: f64,
@@ -171,14 +181,14 @@ impl App {
 }
 
 fn schedule_flash_removal(
-    runtime: UiRuntime,
-    session: UiSession,
+    async_engine: UiAsyncEngine,
+    task_queuer: UiTaskQueuer,
     id_slot: Arc<Mutex<Option<ElementId>>>,
     after: Duration,
 ) -> JoinHandle<()> {
-    runtime.spawn(async move {
+    async_engine.spawn(async move {
         sleep(after).await;
-        session.queue_update(move |ui| {
+        task_queuer.queue_update(move |ui| {
             if let Some(element_id) = id_slot.lock().unwrap().take() {
                 let _ = ui.remove_and_reflow(element_id);
             }
@@ -187,9 +197,9 @@ fn schedule_flash_removal(
 }
 
 fn main() {
-    let mut ui = RuntimeUi::new();
-    let runtime = ui.runtime();
-    let session = ui.ui_session();
+    let mut ui = TersseUi::new();
+    let async_engine = ui.async_engine();
+    let task_queuer = ui.ui_task_queuer();
     let app: Rc<RefCell<Option<App>>> = Rc::new(RefCell::new(None));
 
     let _title_id = ui.create_element(static_text_display_unfocusable_fit_width(
@@ -199,8 +209,8 @@ fn main() {
     ));
 
     let foo_app = Rc::clone(&app);
-    let foo_runtime = runtime.clone();
-    let foo_session = session.clone();
+    let foo_async_engine = async_engine.clone();
+    let foo_task_queuer = task_queuer.clone();
     let foo_id = ui.create_element(button(
         ElementPlacement::absolute(Location { x: 0, y: 2 }),
         FOO_BAR_BUTTON_WIDTH,
@@ -211,15 +221,15 @@ fn main() {
         Box::new(move |ui| {
             foo_app.borrow_mut().as_mut().unwrap().handle_foo(
                 ui,
-                foo_runtime.clone(),
-                &foo_session,
+                foo_async_engine.clone(),
+                &foo_task_queuer,
             );
         }),
     ));
 
     let bar_app = Rc::clone(&app);
-    let bar_runtime = runtime.clone();
-    let bar_session = session.clone();
+    let bar_async_engine = async_engine.clone();
+    let bar_task_queuer = task_queuer.clone();
     let bar_id = ui.create_element(button(
         ElementPlacement::absolute(Location { x: 0, y: 3 }),
         FOO_BAR_BUTTON_WIDTH,
@@ -230,13 +240,13 @@ fn main() {
         Box::new(move |ui| {
             bar_app.borrow_mut().as_mut().unwrap().handle_bar(
                 ui,
-                bar_runtime.clone(),
-                &bar_session,
+                bar_async_engine.clone(),
+                &bar_task_queuer,
             );
         }),
     ));
 
-    let mung_session = session.clone();
+    let mung_task_queuer = task_queuer.clone();
     let _mung_id = ui.create_element(button(
         ElementPlacement::relative_to(
             bar_id,
@@ -252,7 +262,7 @@ fn main() {
         button_style(),
         "Mung",
         Box::new(move |_ui| {
-            mung_session.send_message(format!("{}What ?", random_base64_chars(5)));
+            mung_task_queuer.send_message(format!("{}What ?", random_base64_chars(5)));
         }),
     ));
 

@@ -3,9 +3,9 @@ use std::sync::{Arc, Mutex};
 
 use crate::terminal_input::TerminalPoll;
 
-use super::RuntimeUi;
+use super::TersseUi;
 
-type UiWork = Box<dyn FnOnce(&mut RuntimeUi) + Send>;
+type UiWork = Box<dyn FnOnce(&mut TersseUi) + Send>;
 pub(crate) type UiQueue = Arc<Mutex<Vec<UiWork>>>;
 pub(crate) type UiSignalSender = mpsc::Sender<UiSignal>;
 pub(crate) type UiSignalReceiver = mpsc::Receiver<UiSignal>;
@@ -27,12 +27,12 @@ pub(crate) fn new_ui_signal_channel() -> (UiSignalSender, UiSignalReceiver) {
 
 /// Handle for queueing work to run synchronously on the UI thread.
 #[derive(Clone)]
-pub struct UiSession {
+pub struct UiTaskQueuer {
     queue: UiQueue,
     signal_tx: UiSignalSender,
 }
 
-impl UiSession {
+impl UiTaskQueuer {
     pub(crate) fn new(queue: UiQueue, signal_tx: UiSignalSender) -> Self {
         Self { queue, signal_tx }
     }
@@ -41,7 +41,7 @@ impl UiSession {
     ///
     /// The UI is redrawn after `work` finishes, respecting the queue update redraw
     /// debounce interval. This method is safe to call from any thread or async runtime.
-    pub fn queue_update(&self, work: impl FnOnce(&mut RuntimeUi) + Send + 'static) {
+    pub fn queue_update(&self, work: impl FnOnce(&mut TersseUi) + Send + 'static) {
         self.queue.lock().unwrap().push(Box::new(work));
         let _ = self.signal_tx.send(UiSignal::QueueUpdated);
     }
@@ -62,7 +62,7 @@ pub(crate) fn ui_queue_has_pending(queue: &UiQueue) -> bool {
     !queue.lock().unwrap().is_empty()
 }
 
-impl RuntimeUi {
+impl TersseUi {
     pub(crate) fn drain_ui_queue(&mut self) -> bool {
         let works: Vec<UiWork> = {
             let mut pending = self.ui_queue.lock().unwrap();

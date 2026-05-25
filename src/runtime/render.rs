@@ -12,9 +12,9 @@ use crate::ElementId;
 use pancurses::{curs_set, COLOR_PAIR};
 
 use super::types::ElementHeightMode;
-use super::RuntimeUi;
+use super::TersseUi;
 
-impl RuntimeUi {
+impl TersseUi {
     pub(super) fn request_draw(&mut self) {
         self.redraw_debounce_until.get_or_insert_with(|| {
             resize_debounce::debounce_deadline(
@@ -24,7 +24,7 @@ impl RuntimeUi {
         });
     }
 
-    /// Applies a debounced UI redraw for queued UiSession updates.
+    /// Applies a debounced UI redraw for queued UiTaskQueuer updates.
     pub(super) fn tick_redraw_debounce(&mut self) -> bool {
         self.flush_pending_queue_redraw(false)
     }

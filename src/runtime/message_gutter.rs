@@ -14,9 +14,9 @@ use crate::pure::terminal_bounds;
 use crate::Color;
 use crate::ElementId;
 
-use super::RuntimeUi;
+use super::TersseUi;
 
-impl RuntimeUi {
+impl TersseUi {
     pub(super) fn message_gutter_expiry_deadline(&self) -> Option<Instant> {
         self.message_gutter_expires_at
     }

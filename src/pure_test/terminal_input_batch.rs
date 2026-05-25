@@ -1,6 +1,6 @@
 //! Pure model of terminal poll batch handling for coalesced paste + redraw semantics.
 //!
-//! Mirrors `RuntimeUi::handle_terminal_poll_batch` pending-text and redraw rules.
+//! Mirrors `TersseUi::handle_terminal_poll_batch` pending-text and redraw rules.
 
 pub use crate::pure::terminal_input_batch::PendingPasteBuffer;
 use crate::pure_test::terminal_poll_coalesce::{self, TerminalPollItem};

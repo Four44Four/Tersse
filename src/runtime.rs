@@ -19,23 +19,23 @@ mod resize;
 mod screen_scroll;
 mod text_input_state;
 mod types;
-mod ui_session;
+mod ui_task_queuer;
 
 pub use types::{
     ElementConfig, ElementHandler, ElementHeightMode, FocusStyle, Style, TerminalResizeHandler,
     TextInputBehavior, TextInputStyle,
 };
-pub use ui_session::UiSession;
+pub use ui_task_queuer::UiTaskQueuer;
 
-/// Cloneable handle to the shared Tokio runtime used by [`RuntimeUi`].
+/// Cloneable handle to the shared Tokio runtime used by [`TersseUi`].
 ///
 /// Use this to spawn async background tasks without creating a separate runtime.
 #[derive(Clone, Debug)]
-pub struct UiRuntime {
+pub struct UiAsyncEngine {
     handle: tokio::runtime::Handle,
 }
 
-impl UiRuntime {
+impl UiAsyncEngine {
     pub(crate) fn new(handle: tokio::runtime::Handle) -> Self {
         Self { handle }
     }
@@ -76,7 +76,7 @@ pub fn runtime_clamp_fixed_height(height: usize) -> usize {
     height.max(1)
 }
 
-pub struct RuntimeUi {
+pub struct TersseUi {
     win: Window,
     elements: ElementStore,
     focused_position: usize,
@@ -91,9 +91,9 @@ pub struct RuntimeUi {
     screen_scroll: usize,
     /// Upward reveal offset while the top message gutter is visible or after a scroll-reveal hide.
     screen_scroll_up_reveal: usize,
-    ui_queue: ui_session::UiQueue,
-    ui_signal_tx: ui_session::UiSignalSender,
-    ui_signal_rx: ui_session::UiSignalReceiver,
+    ui_queue: ui_task_queuer::UiQueue,
+    ui_signal_tx: ui_task_queuer::UiSignalSender,
+    ui_signal_rx: ui_task_queuer::UiSignalReceiver,
     async_driver: Option<core::AsyncRuntimeDriver>,
     has_rendered_first_frame: bool,
     ui_queue_redraw_pending: bool,

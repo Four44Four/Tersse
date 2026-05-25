@@ -23,8 +23,8 @@ pub use element_presets::{
 pub use element_id::ElementId;
 pub use pure::element_placement::{ElementPlacement, ParentSide};
 pub use runtime::{
-    ElementConfig, ElementHandler, ElementHeightMode, FocusStyle, RuntimeUi, Style,
-    TerminalResizeHandler, TextInputBehavior, TextInputStyle, UiRuntime, UiSession,
+    ElementConfig, ElementHandler, ElementHeightMode, FocusStyle, Style, TersseUi,
+    TerminalResizeHandler, TextInputBehavior, TextInputStyle, UiAsyncEngine, UiTaskQueuer,
 };
 
 pub mod prelude {
@@ -33,8 +33,8 @@ pub mod prelude {
         static_text_display_unfocusable_fit_width, static_text_fit_height, static_text_fixed,
         text_input_fit_height, text_input_fixed, Color, ElementConfig, ElementHandler,
         ElementHeightMode, ElementId, ElementPlacement, FocusStyle, Location, ParentSide,
-        RuntimeUi, Style, TerminalResizeHandler, TextInputBehavior, TextInputStyle, UiRuntime,
-        UiSession, terminal_size,
+        Style, TersseUi, TerminalResizeHandler, TextInputBehavior, TextInputStyle, UiAsyncEngine,
+        UiTaskQueuer, terminal_size,
     };
 }
 
