@@ -4,8 +4,6 @@ pub mod clipboard;
 mod constants;
 pub mod element_presets;
 mod element_id;
-#[cfg(feature = "test-api")]
-mod legacy_element_store;
 #[cfg(not(feature = "pure-tests"))]
 mod pure;
 #[cfg(feature = "pure-tests")]

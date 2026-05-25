@@ -1,8 +1,8 @@
 use tersse::pure_test::element_placement::{
-    default_child_location, descendant_ids, rectangles_overlap, resolve_absolute_location,
-    resolve_overlap_location, ElementBounds, ElementPlacement, ParentSide,
+    default_child_location, descendant_ids, element_id_from_internal, rectangles_overlap,
+    resolve_absolute_location, resolve_overlap_location, ElementBounds, ElementPlacement,
+    ParentSide,
 };
-use tersse::test_api::{create_text_element, Element, ElementStore};
 use tersse::Location;
 
 fn bounds(x: u16, y: u16, width: usize, height: usize) -> ElementBounds {
@@ -12,10 +12,6 @@ fn bounds(x: u16, y: u16, width: usize, height: usize) -> ElementBounds {
         width,
         height,
     }
-}
-
-fn field() -> Element {
-    create_text_element(1, "")
 }
 
 #[test]
@@ -56,10 +52,8 @@ fn top_side_places_child_above_parent() {
 
 #[test]
 fn descendant_ids_collects_nested_children() {
-    let mut store = ElementStore::new();
-    let root = store.insert(0.0, field());
-    let child = store.insert(0.0, field());
-    let grandchild = store.insert(0.0, field());
+    let root = element_id_from_internal(0);
+    let child = element_id_from_internal(1);
 
     let placements = vec![
         (0, ElementPlacement::absolute(Location::default())),
@@ -74,7 +68,6 @@ fn descendant_ids_collects_nested_children() {
     ];
     let ids = descendant_ids(0, &placements);
     assert_eq!(ids, vec![1, 2]);
-    let _ = grandchild;
 }
 
 #[test]
@@ -102,8 +95,7 @@ fn absolute_placement_uses_terminal_origin_plus_offset() {
 
 #[test]
 fn relative_placement_uses_parent_bounds() {
-    let mut store = ElementStore::new();
-    let parent = store.insert(0.0, field());
+    let parent = element_id_from_internal(0);
     let placement = ElementPlacement::relative_to(parent, ParentSide::Bottom, Location::default());
     let loc =
         resolve_absolute_location(&placement, Some(bounds(0, 4, 20, 1)), bounds(0, 0, 80, 12))
@@ -113,12 +105,6 @@ fn relative_placement_uses_parent_bounds() {
 
 #[test]
 fn overlap_resolution_pushes_existing_lower_element() {
-    let mut store = ElementStore::new();
-    let _ = store.insert(0.0, field());
-    let _ = store.insert(0.0, field());
-    let _ = store.insert(0.0, field());
-    let _ = store.insert(0.0, field());
-
     let candidate = bounds(0, 3, 8, 1);
     let others = vec![(2, bounds(0, 3, 5, 1), None)];
     let (loc, shifts) = resolve_overlap_location(candidate, &others, 3, Some(1));

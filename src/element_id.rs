@@ -1,4 +1,4 @@
-//! Opaque element handle shared by the runtime and legacy test store.
+//! Opaque element handle used by runtime and placement APIs.
 
 /// Opaque handle for an element assigned by the store.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

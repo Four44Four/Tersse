@@ -76,15 +76,6 @@ pub fn runtime_clamp_fixed_height(height: usize) -> usize {
     height.max(1)
 }
 
-#[cfg(feature = "test-api")]
-pub fn runtime_text_input_state_snapshot(
-    text: impl Into<String>,
-    cursor: usize,
-    selection_anchor: Option<usize>,
-) -> crate::pure::text_input::TextInputState {
-    types::text_input_state_from_parts(text, cursor, selection_anchor)
-}
-
 pub struct RuntimeUi {
     win: Window,
     elements: ElementStore,
