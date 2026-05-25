@@ -1,5 +1,7 @@
  - Whenever an element is added/created or removed, has its position changed, has its dimensions changed, or otherwise would cause a reflow/shifting of positions of other elements:
-    - Redraw that element and all elements below it
+    - Redraw that element
+    - If the element would cause a reflow of other elements or push/pull other elements:
+       - Redraw all elements below that element
  - Whenever an element is removed:
     - Clear the space that the element occupied
     - Then redraw appropriate elements

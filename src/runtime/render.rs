@@ -113,11 +113,49 @@ impl RuntimeUi {
         }
     }
 
-    pub(super) fn mark_element_and_below_changed(&mut self, id: ElementId) {
-        let Some(location) = self.element_location(id) else {
-            return;
-        };
-        self.mark_from_y_changed(location.y);
+    pub(super) fn capture_layout_snapshot(
+        &self,
+    ) -> (Vec<crate::pure::ui_redraw::ElementLocationSnapshot>, Vec<(usize, Option<usize>)>) {
+        let locations = self
+            .elements
+            .iter()
+            .map(|element| crate::pure::ui_redraw::ElementLocationSnapshot {
+                id: element.id(),
+                x: element.location.x,
+                y: element.location.y,
+            })
+            .collect();
+        let parents = self
+            .elements
+            .iter()
+            .map(|element| (element.id(), element.placement.parent_id))
+            .collect();
+        (locations, parents)
+    }
+
+    pub(super) fn mark_layout_redraw_after(
+        &mut self,
+        primary_id: ElementId,
+        before: (Vec<crate::pure::ui_redraw::ElementLocationSnapshot>, Vec<(usize, Option<usize>)>),
+    ) {
+        let (before_locations, before_parents) = before;
+        let (after_locations, _) = self.capture_layout_snapshot();
+        let (decision, redraw_ids, anchor_y) = ui_redraw::layout_redraw_decision(
+            primary_id.as_internal(),
+            &before_locations,
+            &after_locations,
+            &before_parents,
+        );
+        match decision {
+            ui_redraw::LayoutRedrawDecision::CascadeFromY => {
+                self.mark_from_y_changed(anchor_y);
+            }
+            ui_redraw::LayoutRedrawDecision::Elements => {
+                for id in redraw_ids {
+                    self.mark_element_only_changed(ElementId::from_internal(id));
+                }
+            }
+        }
     }
 
     pub(super) fn mark_from_y_changed(&mut self, y: u16) {

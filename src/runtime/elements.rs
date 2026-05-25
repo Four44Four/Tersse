@@ -23,6 +23,7 @@ impl RuntimeUi {
     }
 
     pub fn create_element(&mut self, config: ElementConfig) -> ElementId {
+        let before = self.capture_layout_snapshot();
         let id = self.create_element_id();
         let focused_id = self.current_focused_id();
         let (width, height) = Self::element_config_dimensions(&config);
@@ -34,15 +35,15 @@ impl RuntimeUi {
         self.restore_focus(focused_id);
         self.invalidate_text_input_layout_cache(id);
         self.refresh_height_cache();
-        self.mark_element_and_below_changed(id);
+        self.mark_layout_redraw_after(id, before);
         id
     }
 
     pub fn update_element(&mut self, id: ElementId, config: ElementConfig) -> bool {
-        let old_bounds = self.element_bounds(id);
         if !self.elements.contains_id(id.as_internal()) {
             return false;
         }
+        let before = self.capture_layout_snapshot();
         let focused_id = self.current_focused_id();
         let (width, height) = Self::element_config_dimensions(&config);
         let location =
@@ -53,12 +54,7 @@ impl RuntimeUi {
         self.restore_focus(focused_id);
         self.invalidate_text_input_layout_cache(id);
         self.refresh_height_cache();
-        self.mark_from_y_changed(
-            old_bounds
-                .zip(self.element_bounds(id))
-                .map(|(old, new)| old.y.min(new.y))
-                .unwrap_or_default(),
-        );
+        self.mark_layout_redraw_after(id, before);
         true
     }
 
@@ -70,6 +66,7 @@ impl RuntimeUi {
         let Some(bounds) = self.element_bounds(id) else {
             return false;
         };
+        let before = self.capture_layout_snapshot();
         let min_y = layout_reflow::min_y_after_change(bounds.y, bounds.height);
         let rows = bounds.height as u16;
         if !self.remove_element_cascade(id) {
@@ -79,11 +76,12 @@ impl RuntimeUi {
             self.pull_elements_up_from(min_y, rows, &[]);
         }
         self.refresh_height_cache();
-        self.mark_from_y_changed(bounds.y);
+        self.mark_layout_redraw_after(id, before);
         true
     }
 
     pub fn remove_element(&mut self, id: ElementId) -> bool {
+        let before = self.capture_layout_snapshot();
         let removed_bounds = self.element_bounds(id);
         let focused_id = self.current_focused_id();
         if self.elements.remove(id.as_internal()).is_some() {
@@ -92,8 +90,8 @@ impl RuntimeUi {
             self.invalidate_text_input_layout_cache(id);
             if let Some(bounds) = removed_bounds {
                 self.clear_element_occupied_space(bounds);
-                self.mark_from_y_changed(bounds.y);
             }
+            self.mark_layout_redraw_after(id, before);
             true
         } else {
             false
@@ -126,9 +124,10 @@ impl RuntimeUi {
         if delta_x == 0 && delta_y == 0 {
             return true;
         }
+        let before = self.capture_layout_snapshot();
         self.shift_element_subtree(id, delta_x as i16, delta_y);
         self.recompute_all_relative_locations();
-        self.mark_from_y_changed(old_location.y.min(location.y));
+        self.mark_layout_redraw_after(id, before);
         true
     }
 
@@ -138,10 +137,7 @@ impl RuntimeUi {
         width: usize,
         height_mode: ElementHeightMode,
     ) -> bool {
-        let anchor_y = self
-            .element_location(id)
-            .map(|location| location.y)
-            .unwrap_or_default();
+        let before = self.capture_layout_snapshot();
         if let Some(element) = self.element_mut_by_id(id) {
             element.width = width.max(1);
             element.height_mode = match height_mode {
@@ -149,7 +145,7 @@ impl RuntimeUi {
                 ElementHeightMode::FitContent => ElementHeightMode::FitContent,
             };
             self.recompute_all_relative_locations();
-            self.mark_from_y_changed(anchor_y);
+            self.mark_layout_redraw_after(id, before);
             true
         } else {
             false
@@ -161,13 +157,7 @@ impl RuntimeUi {
     }
 
     pub fn set_element_text(&mut self, id: ElementId, text: impl Into<String>) -> bool {
-        let Some(old_height) = self.element_render_height_by_id(id) else {
-            return false;
-        };
-        let anchor_y = self
-            .element_location(id)
-            .map(|location| location.y)
-            .unwrap_or_default();
+        let before = self.capture_layout_snapshot();
         if let Some(element) = self.element_mut_by_id(id) {
             element.text = text.into();
             if let Some(input) = element.text_input.as_mut() {
@@ -177,12 +167,8 @@ impl RuntimeUi {
             element.scroll = 0;
             self.invalidate_text_input_layout_cache(id);
             self.recompute_all_relative_locations();
-            let new_height = self.element_render_height_by_id(id).unwrap_or(old_height);
-            if old_height != new_height {
-                self.mark_from_y_changed(anchor_y);
-            } else {
-                self.mark_element_only_changed(id);
-            }
+            self.refresh_height_cache();
+            self.mark_layout_redraw_after(id, before);
             true
         } else {
             false
@@ -194,6 +180,7 @@ impl RuntimeUi {
         id: ElementId,
         behavior: Option<TextInputBehavior>,
     ) -> bool {
+        let before = self.capture_layout_snapshot();
         if let Some(element) = self.element_mut_by_id(id) {
             element.text_input = behavior.map(|next| super::types::RuntimeTextInput {
                 locked: next.locked,
@@ -203,7 +190,8 @@ impl RuntimeUi {
             });
             self.invalidate_text_input_layout_cache(id);
             self.recompute_all_relative_locations();
-            self.mark_element_and_below_changed(id);
+            self.refresh_height_cache();
+            self.mark_layout_redraw_after(id, before);
             true
         } else {
             false
@@ -254,13 +242,5 @@ impl RuntimeUi {
 
     pub(super) fn element_mut_by_id(&mut self, id: ElementId) -> Option<&mut RuntimeElement> {
         self.elements.get_mut(id.as_internal())
-    }
-
-    fn element_render_height_by_id(&mut self, id: ElementId) -> Option<usize> {
-        let element = self.element_by_id(id)?;
-        if element.text_input.is_some() && element.fixed_viewport_height().is_none() {
-            return self.text_input_render_height(id);
-        }
-        Some(self.element_render_height(element))
     }
 }
