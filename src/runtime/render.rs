@@ -231,245 +231,157 @@ impl RuntimeUi {
     }
 
     fn draw_element(&mut self, id: usize) {
-        let Some(element) = self.elements.get(id) else {
-            return;
-        };
-        if element.text_input.is_some() {
-            self.draw_text_input(id);
-        } else if element.is_button() {
-            self.draw_button(id);
-        } else if matches!(element.height_mode, ElementHeightMode::Fixed(_)) {
-            self.draw_text_display(id);
-        } else if element.is_fit_static_display() {
-            self.draw_wrapped_static_text(id);
-        } else {
-            self.draw_button(id);
-        }
-    }
-
-    fn draw_button(&mut self, id: usize) {
-        let (location, text, width, style) = match self.elements.get(id) {
-            Some(element) => {
-                let style = if element.focused {
-                    element.style.focused
-                } else {
-                    element.style.unfocused
-                };
-                (element.location, element.text.clone(), element.width, style)
-            }
-            _ => return,
-        };
-
-        let (max_y, max_x) = self.win.get_max_yx();
-        let x = location.x as i32;
-        let y = self.scrolled_y(location.y as i32);
-        if !terminal_bounds::row_is_visible(y, max_y) || self.is_message_gutter_screen_row(y) {
-            return;
-        }
-        let (_, draw_h) = terminal_bounds::clip_rect(x, y, width.max(1) as i32, 1, max_x, max_y);
-        if draw_h <= 0 {
-            return;
-        }
-        let row_cols =
-            self.cols_for_printing_respecting_message_gutter(x, max_x, y, max_y) as usize;
-        let draw_width = width.max(1).min(row_cols);
-
-        let label = crate::pure::button::truncate_label(&text, draw_width);
-        let pad_cols = crate::pure::button::padding_cols(&label, draw_width);
-
-        let pair = self.color_pair(style.fg, style.bg);
-        self.win.attron(COLOR_PAIR(pair as u64));
-        self.win.mv(y, x);
-        if !label.is_empty() {
-            self.win.addstr(&label);
-        }
-        for _ in 0..pad_cols {
-            self.win.addch(' ');
-        }
-        self.win.attroff(COLOR_PAIR(pair as u64));
-    }
-
-    fn draw_text_input(&mut self, id: usize) {
         let (
             location,
             width,
             text,
             scroll,
-            fixed_viewport,
-            cursor,
-            selection_anchor,
-            style,
+            height_mode,
+            focused,
+            base_style,
+            text_input_state,
+            text_input_style,
+            selection_style,
         ) = match self.elements.get(id) {
             Some(element) => {
-                let Some(input) = element.text_input.as_ref() else {
-                    return;
-                };
-                let style = if input.locked {
-                    if element.focused {
-                        input.style.focused_locked
+                let (text_input_state, text_input_style, selection_style) =
+                    if let Some(input) = element.text_input.as_ref() {
+                        let active_style = if input.locked {
+                            if element.focused {
+                                input.style.focused_locked
+                            } else {
+                                input.style.unfocused_locked
+                            }
+                        } else if element.focused {
+                            input.style.focused_unlocked
+                        } else {
+                            input.style.unfocused_unlocked
+                        };
+                        (
+                            Some((input.cursor, input.selection_anchor)),
+                            Some(active_style),
+                            Some(input.style.selection),
+                        )
                     } else {
-                        input.style.unfocused_locked
-                    }
-                } else if element.focused {
-                    input.style.focused_unlocked
-                } else {
-                    input.style.unfocused_unlocked
-                };
+                        (None, None, None)
+                    };
                 (
                     element.location,
                     element.width.max(1),
                     element.text.clone(),
                     element.scroll,
-                    element.fixed_viewport_height(),
-                    input.cursor,
-                    input.selection_anchor,
-                    (style, input.style.selection),
+                    element.height_mode,
+                    element.focused,
+                    element.style,
+                    text_input_state,
+                    text_input_style,
+                    selection_style,
                 )
             }
             _ => return,
         };
 
-        let base_pair = self.color_pair(style.0.fg, style.0.bg);
-        let selection_pair = self.color_pair(style.1.fg, style.1.bg);
-        let (max_y, max_x) = self.win.get_max_yx();
-        let x = location.x as i32;
-        let y = self.scrolled_y(location.y as i32);
-        let lines = text_wrap::wrapped_lines_for_display(&text, width);
-        let total_lines = lines.len();
-        let logical_rows = fixed_viewport
-            .map(|h| h as i32)
-            .unwrap_or_else(|| total_lines as i32);
-        let (draw_w, draw_h) =
-            terminal_bounds::clip_rect(x, y, width as i32, logical_rows, max_x, max_y);
-        if draw_w <= 0 || draw_h <= 0 {
-            return;
-        }
-        let state = TextInputState {
-            text: text.clone(),
-            cursor,
-            selection_anchor,
-        };
-        let selection = text_input::selection_range(&state);
-        let highlight_cells = text_wrap::selection_highlight_cells(&text, selection, width);
-
-        let scroll_viewport = fixed_viewport.unwrap_or_else(|| {
-            self.text_input_terminal_visible_rows(location.y, total_lines)
-                .max(1)
-        });
-        if let Some(_fixed_height) = fixed_viewport {
-            let offset = scroll_view::clamp_scroll_offset(scroll, total_lines, scroll_viewport);
-            let visible_lines =
-                scroll_view::visible_line_range(offset, scroll_viewport, total_lines);
-            let content_rows = visible_lines.len() as i32;
-            if content_rows <= 0 {
-                return;
-            }
-            self.fill_solid_viewport_rows(y, x, draw_w, content_rows, base_pair, true);
-            for (row, line_idx) in visible_lines.clone().enumerate() {
-                let row_y = y + row as i32;
-                if self.is_message_gutter_screen_row(row_y)
-                    || !terminal_bounds::row_is_visible(row_y, max_y)
-                {
-                    continue;
-                }
-                let max_cols = self.max_element_row_cols_respecting_message_gutter(
-                    x,
-                    max_x,
-                    row_y,
-                    max_y,
-                    width as i32,
-                ) as usize;
-                if max_cols == 0 {
-                    continue;
-                }
-                let line = lines.get(line_idx).map(String::as_str).unwrap_or("");
-                for (col, ch) in line.chars().enumerate() {
-                    if col >= max_cols {
-                        break;
-                    }
-                    let pair = if highlight_cells.contains(&(line_idx, col)) {
-                        selection_pair
-                    } else {
-                        base_pair
-                    };
-                    self.win.attron(COLOR_PAIR(pair as u64));
-                    self.win.mv(row_y, x + col as i32);
-                    self.win.addch(ch);
-                    self.win.attroff(COLOR_PAIR(pair as u64));
-                }
-                for col in line.chars().count()..max_cols {
-                    if highlight_cells.contains(&(line_idx, col)) {
-                        self.win.attron(COLOR_PAIR(selection_pair as u64));
-                        self.win.mv(row_y, x + col as i32);
-                        self.win.addch(' ');
-                        self.win.attroff(COLOR_PAIR(selection_pair as u64));
-                    }
-                }
-            }
-
-            for (line_idx, col) in highlight_cells {
-                if line_idx < offset || line_idx >= offset + scroll_viewport {
-                    continue;
-                }
-                let row_y = y + (line_idx - offset) as i32;
-                if self.is_message_gutter_screen_row(row_y)
-                    || !terminal_bounds::row_is_visible(row_y, max_y)
-                {
-                    continue;
-                }
-                let max_cols = self.max_element_row_cols_respecting_message_gutter(
-                    x,
-                    max_x,
-                    row_y,
-                    max_y,
-                    width as i32,
-                ) as usize;
-                if col >= max_cols {
-                    continue;
-                }
-                let line_len = lines
-                    .get(line_idx as usize)
-                    .map(|line| line.chars().count())
-                    .unwrap_or(0);
-                if col < line_len {
-                    continue;
-                }
-                self.win.attron(COLOR_PAIR(selection_pair as u64));
-                self.win.mv(row_y, x + col as i32);
-                self.win.addch(' ');
-                self.win.attroff(COLOR_PAIR(selection_pair as u64));
-            }
+        let active_style = if let Some(style) = text_input_style {
+            style
+        } else if focused {
+            base_style.focused
         } else {
-            let visible_lines =
-                terminal_bounds::visible_element_line_range(y, total_lines as i32, max_y);
-            if visible_lines.is_empty() {
-                return;
+            base_style.unfocused
+        };
+        let base_pair = self.color_pair(active_style.fg, active_style.bg);
+        let selection_pair =
+            selection_style.map(|style| self.color_pair(style.fg, style.bg));
+
+        let mut lines = if text_input_state.is_some() {
+            text_wrap::wrapped_lines_for_display(&text, width)
+        } else {
+            text_wrap::wrapped_lines(&text, width)
+        };
+        if lines.is_empty() {
+            lines.push(String::new());
+        }
+        let total_lines = lines.len();
+
+        let logical_rows = match height_mode {
+            ElementHeightMode::Fixed(height) => height.max(1),
+            ElementHeightMode::FitContent => total_lines.max(1),
+        };
+        let (max_y, max_x) = self.win.get_max_yx();
+        let x = location.x as i32;
+        let y = self.scrolled_y(location.y as i32);
+        let (draw_w, draw_h) =
+            terminal_bounds::clip_rect(x, y, width as i32, logical_rows as i32, max_x, max_y);
+        if draw_w <= 0 || draw_h <= 0 {
+            return;
+        }
+
+        match height_mode {
+            ElementHeightMode::Fixed(_) => self.fill_solid(y, x, draw_w, draw_h, base_pair),
+            ElementHeightMode::FitContent => {
+                self.fill_solid_rows(y, x, draw_w, logical_rows as i32, base_pair, true)
             }
-            self.fill_solid_rows(y, x, draw_w, total_lines as i32, base_pair, true);
-            for line_idx in visible_lines.clone() {
-                let line_idx = line_idx as usize;
-                let row_y = y + line_idx as i32;
-                if self.is_message_gutter_screen_row(row_y)
-                    || !terminal_bounds::row_is_visible(row_y, max_y)
-                {
-                    continue;
+        }
+
+        let (visible_lines, line_to_screen_row): (Vec<usize>, Box<dyn Fn(usize) -> i32>) =
+            match height_mode {
+                ElementHeightMode::Fixed(height) => {
+                    let viewport_rows = height.max(1);
+                    let offset =
+                        scroll_view::clamp_scroll_offset(scroll, total_lines, viewport_rows);
+                    (
+                        scroll_view::visible_line_range(offset, viewport_rows, total_lines)
+                            .collect(),
+                        Box::new(move |line_idx| (line_idx.saturating_sub(offset)) as i32),
+                    )
                 }
-                let max_cols = self.max_element_row_cols_respecting_message_gutter(
-                    x,
-                    max_x,
-                    row_y,
-                    max_y,
-                    width as i32,
-                ) as usize;
-                if max_cols == 0 {
-                    continue;
-                }
-                let line = lines.get(line_idx).map(String::as_str).unwrap_or("");
+                ElementHeightMode::FitContent => (
+                    terminal_bounds::visible_element_line_range(y, logical_rows as i32, max_y)
+                        .map(|row| row as usize)
+                        .collect(),
+                    Box::new(move |line_idx| line_idx as i32),
+                ),
+            };
+
+        let highlight_cells = text_input_state.map(|(cursor, selection_anchor)| {
+            let state = TextInputState {
+                text: text.clone(),
+                cursor,
+                selection_anchor,
+            };
+            let selection = text_input::selection_range(&state);
+            text_wrap::selection_highlight_cells(&text, selection, width)
+        });
+
+        if highlight_cells.is_none() {
+            self.win.attron(COLOR_PAIR(base_pair as u64));
+        }
+        for line_idx in visible_lines {
+            let row_y = y + line_to_screen_row(line_idx);
+            if self.is_message_gutter_screen_row(row_y)
+                || !terminal_bounds::row_is_visible(row_y, max_y)
+            {
+                continue;
+            }
+            let max_cols = self.max_element_row_cols_respecting_message_gutter(
+                x,
+                max_x,
+                row_y,
+                max_y,
+                width as i32,
+            ) as usize;
+            if max_cols == 0 {
+                continue;
+            }
+            let line = lines.get(line_idx).map(String::as_str).unwrap_or("");
+
+            if let (Some(cells), Some(selection_pair)) =
+                (highlight_cells.as_ref(), selection_pair)
+            {
                 for (col, ch) in line.chars().enumerate() {
                     if col >= max_cols {
                         break;
                     }
-                    let pair = if highlight_cells.contains(&(line_idx, col)) {
+                    let pair = if cells.contains(&(line_idx, col)) {
                         selection_pair
                     } else {
                         base_pair
@@ -480,170 +392,23 @@ impl RuntimeUi {
                     self.win.attroff(COLOR_PAIR(pair as u64));
                 }
                 for col in line.chars().count()..max_cols {
-                    if highlight_cells.contains(&(line_idx, col)) {
-                        self.win.attron(COLOR_PAIR(selection_pair as u64));
-                        self.win.mv(row_y, x + col as i32);
-                        self.win.addch(' ');
-                        self.win.attroff(COLOR_PAIR(selection_pair as u64));
+                    if !cells.contains(&(line_idx, col)) {
+                        continue;
                     }
+                    self.win.attron(COLOR_PAIR(selection_pair as u64));
+                    self.win.mv(row_y, x + col as i32);
+                    self.win.addch(' ');
+                    self.win.attroff(COLOR_PAIR(selection_pair as u64));
                 }
-            }
-
-            for (line_idx, col) in highlight_cells {
-                if line_idx < visible_lines.start as usize || line_idx >= visible_lines.end as usize
-                {
-                    continue;
-                }
-                let row_y = y + line_idx as i32;
-                if self.is_message_gutter_screen_row(row_y)
-                    || !terminal_bounds::row_is_visible(row_y, max_y)
-                {
-                    continue;
-                }
-                let max_cols = self.max_element_row_cols_respecting_message_gutter(
-                    x,
-                    max_x,
-                    row_y,
-                    max_y,
-                    width as i32,
-                ) as usize;
-                if col >= max_cols {
-                    continue;
-                }
-                let line_len = lines
-                    .get(line_idx as usize)
-                    .map(|line| line.chars().count())
-                    .unwrap_or(0);
-                if col < line_len {
-                    continue;
-                }
-                self.win.attron(COLOR_PAIR(selection_pair as u64));
-                self.win.mv(row_y, x + col as i32);
-                self.win.addch(' ');
-                self.win.attroff(COLOR_PAIR(selection_pair as u64));
+            } else {
+                self.win.mv(row_y, x);
+                let clipped = terminal_bounds::clip_str_to_cols(line, max_cols);
+                self.win.addstr(&clipped);
             }
         }
-    }
-
-    fn draw_wrapped_static_text(&mut self, id: usize) {
-        let (location, width, text, style) = match self.elements.get(id) {
-            Some(element) => {
-                let style = if element.focused {
-                    element.style.focused
-                } else {
-                    element.style.unfocused
-                };
-                (
-                    element.location,
-                    element.width.max(1),
-                    element.text.clone(),
-                    style,
-                )
-            }
-            _ => return,
-        };
-
-        let (max_y, max_x) = self.win.get_max_yx();
-        let x = location.x as i32;
-        let y = self.scrolled_y(location.y as i32);
-        let lines = text_wrap::wrapped_lines(&text, width);
-        let logical_rows = lines.len().max(1) as i32;
-        let draw_w = terminal_bounds::clip_rect(x, y, width as i32, logical_rows, max_x, max_y).0;
-        if draw_w <= 0 {
-            return;
+        if highlight_cells.is_none() {
+            self.win.attroff(COLOR_PAIR(base_pair as u64));
         }
-
-        let pair = self.color_pair(style.fg, style.bg);
-        self.fill_solid_rows(y, x, draw_w, logical_rows, pair, true);
-
-        self.win.attron(COLOR_PAIR(pair as u64));
-        for (line_idx, line) in lines.iter().enumerate() {
-            let row_y = y + line_idx as i32;
-            if !terminal_bounds::row_is_visible(row_y, max_y)
-                || self.is_message_gutter_screen_row(row_y)
-            {
-                continue;
-            }
-            let row_cols = self.max_element_row_cols_respecting_message_gutter(
-                x,
-                max_x,
-                row_y,
-                max_y,
-                width as i32,
-            ) as usize;
-            if row_cols == 0 {
-                continue;
-            }
-            self.win.mv(row_y, x);
-            let clipped = terminal_bounds::clip_str_to_cols(line, row_cols);
-            self.win.addstr(&clipped);
-        }
-        self.win.attroff(COLOR_PAIR(pair as u64));
-    }
-
-    fn draw_text_display(&mut self, id: usize) {
-        let (location, width, height, text, scroll, style) = match self.elements.get(id) {
-            Some(element) => {
-                let ElementHeightMode::Fixed(height) = element.height_mode else {
-                    return;
-                };
-                let style = if element.focused {
-                    element.style.focused
-                } else {
-                    element.style.unfocused
-                };
-                (
-                    element.location,
-                    element.width.max(1),
-                    height.max(1),
-                    element.text.clone(),
-                    element.scroll,
-                    style,
-                )
-            }
-            _ => return,
-        };
-
-        let (max_y, max_x) = self.win.get_max_yx();
-        let x = location.x as i32;
-        let y = self.scrolled_y(location.y as i32);
-        let (draw_w, draw_h) =
-            terminal_bounds::clip_rect(x, y, width as i32, height as i32, max_x, max_y);
-        if draw_w <= 0 || draw_h <= 0 {
-            return;
-        }
-        let draw_rows = draw_h as usize;
-
-        let pair = self.color_pair(style.fg, style.bg);
-        self.fill_solid(y, x, draw_w, draw_h, pair);
-
-        let lines = text_wrap::wrapped_lines(&text, width);
-        if lines.is_empty() {
-            return;
-        }
-        let offset = scroll_view::clamp_scroll_offset(scroll, lines.len(), draw_rows);
-        let range = scroll_view::visible_line_range(offset, draw_rows, lines.len());
-
-        self.win.attron(COLOR_PAIR(pair as u64));
-        for (row, line_idx) in range.enumerate() {
-            let row_y = y + row as i32;
-            if !terminal_bounds::row_is_visible(row_y, max_y)
-                || self.is_message_gutter_screen_row(row_y)
-            {
-                continue;
-            }
-            let row_cols = self.max_element_row_cols_respecting_message_gutter(
-                x,
-                max_x,
-                row_y,
-                max_y,
-                width as i32,
-            ) as usize;
-            self.win.mv(row_y, x);
-            let line = terminal_bounds::clip_str_to_cols(&lines[line_idx], row_cols);
-            self.win.addstr(&line);
-        }
-        self.win.attroff(COLOR_PAIR(pair as u64));
     }
 
     pub(in crate::runtime) fn fill_solid(&self, y: i32, x: i32, w: i32, h: i32, pair: i16) {
@@ -662,47 +427,6 @@ impl RuntimeUi {
             return;
         }
         self.fill_solid_rows(y, x, w, h, pair, false);
-    }
-
-    /// Fills `rows` consecutive screen rows starting at anchor `y` (row index 0 → `y`, 1 → `y+1`, …).
-    fn fill_solid_viewport_rows(
-        &self,
-        y: i32,
-        x: i32,
-        w: i32,
-        rows: i32,
-        pair: i16,
-        skip_message_gutter: bool,
-    ) {
-        let (max_y, max_x) = self.win.get_max_yx();
-        let w = w.min(terminal_bounds::cols_visible_from(x, max_x)).max(0);
-        if w <= 0 || rows <= 0 {
-            return;
-        }
-        self.win.attron(COLOR_PAIR(pair as u64));
-        for row in 0..rows {
-            let row_y = y + row;
-            if !terminal_bounds::row_is_visible(row_y, max_y) {
-                continue;
-            }
-            if skip_message_gutter && self.is_message_gutter_screen_row(row_y) {
-                continue;
-            }
-            let row_w = if skip_message_gutter {
-                self.cols_for_printing_respecting_message_gutter(x, max_x, row_y, max_y)
-                    .min(w)
-            } else {
-                terminal_bounds::cols_for_printing(x, max_x, row_y, max_y).min(w)
-            };
-            if row_w <= 0 {
-                continue;
-            }
-            self.win.mv(row_y, x);
-            for _ in 0..row_w {
-                self.win.addch(' ');
-            }
-        }
-        self.win.attroff(COLOR_PAIR(pair as u64));
     }
 
     /// Fills a solid background across `logical_rows` rows, clipping width to the terminal

@@ -17,7 +17,7 @@ pub enum MsgGutterSide {
 pub const MSG_GUTTER_BG_COLOR: Color = Color::Black;
 
 /// Screen edge where the message gutter is drawn.
-pub const MSG_GUTTER_SIDE: MsgGutterSide = MsgGutterSide::Bottom;
+pub const MSG_GUTTER_SIDE: MsgGutterSide = MsgGutterSide::Top;
 
 /// Maximum number of terminal rows the message gutter may occupy.
 pub const MSG_GUTTER_MAX_HEIGHT: usize = 5;
@@ -48,7 +48,7 @@ pub enum DebugDrawDelayColor {
 /// show a solid placeholder rectangle before drawing the real element. Requires a rebuild
 /// after changing this value (`build.rs` reads it at compile time).
 #[allow(dead_code)]
-pub const DEBUG_SHOULD_DRAW_DO_DELAY: bool = true;
+pub const DEBUG_SHOULD_DRAW_DO_DELAY: bool = false;
 
 /// Placeholder rectangle background color when [`DEBUG_SHOULD_DRAW_DO_DELAY`] is `true`.
 #[allow(dead_code)]

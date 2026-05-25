@@ -95,6 +95,18 @@ async fn run_async_driver(
     }
 }
 
+fn coalesced_text_char_from_key(key: TerminalKey, has_pending_text: bool) -> Option<char> {
+    match key {
+        TerminalKey::Char(c) if !c.is_control() || c == '\t' => Some(c),
+        // Keep standalone key semantics; only fold whitespace/newline keys into an active
+        // text run so paste-like bursts remain a single insertion.
+        TerminalKey::Tab if has_pending_text => Some('\t'),
+        TerminalKey::Space if has_pending_text => Some(' '),
+        TerminalKey::Enter if has_pending_text => Some('\n'),
+        _ => None,
+    }
+}
+
 impl RuntimeUi {
     pub fn new() -> Self {
         let _ = terminal_input::enter_raw_mode();
@@ -265,6 +277,12 @@ impl RuntimeUi {
                 }
                 TerminalPoll::Paste(paste) => pending_text.push_str(&paste),
                 TerminalPoll::Key(key) => {
+                    if let Some(c) =
+                        coalesced_text_char_from_key(key, !pending_text.is_empty())
+                    {
+                        pending_text.push(c);
+                        continue;
+                    }
                     flush_pending_text(self, &mut pending_text);
                     let previous = self.current_focused_id();
                     let (ev, imm) = self.handle_key(key);

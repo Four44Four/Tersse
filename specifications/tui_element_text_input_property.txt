@@ -54,3 +54,6 @@
     - Move all text in current line to start of next line
  - When a newline character is selected:
     - Draw visual selection indicator from the position of the newline character to the end of the current line
+ - When text is inserted or pasted into the element:
+    - Insert all text within 1 redraw of the element
+    - Element should not repeatedly redraw with chunks of text copied in
