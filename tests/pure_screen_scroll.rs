@@ -1,4 +1,4 @@
-use tersse::pure::screen_scroll::{
+use tersse::pure_test::screen_scroll::{
     apply_scroll_to_y, clamp_screen_scroll, screen_content_height, screen_scroll_to_show_cursor_row,
     screen_scroll_to_show_row, screen_viewport_height, scroll_screen_down, scroll_screen_up,
 };

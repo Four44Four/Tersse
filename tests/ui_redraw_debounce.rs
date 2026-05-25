@@ -1,6 +1,6 @@
 use std::time::{Duration, Instant};
 
-use tersse::pure::resize_debounce::{debounce_deadline, debounce_has_elapsed};
+use tersse::pure_test::resize_debounce::{debounce_deadline, debounce_has_elapsed};
 use tersse::test_api::UI_REDRAW_DEBOUNCE_QUEUE_UPDATE_MS;
 
 #[test]

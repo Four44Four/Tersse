@@ -1,6 +1,6 @@
 use std::time::{Duration, Instant};
 
-use tersse::pure::ui_redraw::{
+use tersse::pure_test::ui_redraw::{
     layout_redraw_decision, should_flush_debounced_queue_redraw, ElementLocationSnapshot,
     ElementRedrawPlan, LayoutRedrawDecision,
 };

@@ -14,5 +14,6 @@
  - `cargo test --features test-api`
 
 # Features
- - `test-api`: exposes `tersse::test_api` and `tersse::pure` for integration tests (not for library users)
+ - `test-api`: exposes `tersse::test_api`, `tersse::pure`, and `tersse::pure_test` for integration tests (not for library users)
+ - `pure-tests`: enables `pure_test` (test-only pure helpers); implied by `test-api`
  - `debug_should_draw_do_delay`: draw a debug rectangle for a specified amt of time whenever an element is drawn to show when/where element drawing happens

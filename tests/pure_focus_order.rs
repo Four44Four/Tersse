@@ -1,4 +1,4 @@
-use tersse::pure::focus_order::{
+use tersse::pure_test::focus_order::{
     focusable_order_ids, index_for_focused_id, keyboard_redraw_element_ids, next_index,
     normalize_index, prev_index, sorted_ids,
 };

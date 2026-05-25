@@ -1,4 +1,4 @@
-use tersse::pure::scroll_view::{
+use tersse::pure_test::scroll_view::{
     clamp_scroll_offset, content_overflows, max_scroll_offset, scroll_line_down, scroll_line_up,
     stick_to_bottom, visible_line_range,
 };

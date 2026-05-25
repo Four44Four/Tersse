@@ -32,11 +32,6 @@ pub fn wrapped_lines(text: &str, width: usize) -> Vec<String> {
         .collect()
 }
 
-/// Number of wrapped lines (0 when `text` is empty).
-pub fn wrapped_line_count(text: &str, width: usize) -> usize {
-    wrapped_lines(text, width).len()
-}
-
 /// Wrapped lines for rendering and scrolling; empty `text` yields one blank line.
 ///
 /// Line count matches [`display_row_count`], unlike [`wrapped_lines`] alone.

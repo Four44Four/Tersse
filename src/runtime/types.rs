@@ -174,10 +174,6 @@ pub(super) struct RuntimeElement {
     pub text_input: Option<RuntimeTextInput>,
 }
 
-pub(crate) fn clamp_fixed_height(height: usize) -> usize {
-    height.max(1)
-}
-
 pub(crate) fn text_input_state_from_parts(
     text: impl Into<String>,
     cursor: usize,

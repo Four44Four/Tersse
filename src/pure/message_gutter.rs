@@ -296,20 +296,6 @@ pub fn scroll_screen_down_with_gutter(
     (offset + 1).min(max)
 }
 
-/// Whether scroll input should hide the message gutter.
-///
-/// The gutter is only removed when its display duration expires; keyboard scrolling never hides it.
-pub fn should_hide_gutter_by_scroll_reveal(
-    _screen_scroll: usize,
-    _screen_scroll_up_reveal: usize,
-    _base_content_height: usize,
-    _full_viewport_height: usize,
-    _gutter_height: usize,
-    _side: MsgGutterSide,
-) -> bool {
-    false
-}
-
 /// Largest valid upward reveal offset while the top gutter is visible or capped after hide.
 pub fn max_screen_scroll_up_reveal(
     base_content_height: usize,

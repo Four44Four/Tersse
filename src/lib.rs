@@ -6,10 +6,12 @@ pub mod element_presets;
 mod element_id;
 #[cfg(feature = "test-api")]
 mod legacy_element_store;
-#[cfg(feature = "pure-tests")]
-pub mod pure;
 #[cfg(not(feature = "pure-tests"))]
 mod pure;
+#[cfg(feature = "pure-tests")]
+pub mod pure;
+#[cfg(feature = "pure-tests")]
+pub mod pure_test;
 mod runtime;
 mod terminal_input;
 #[cfg(feature = "test-api")]

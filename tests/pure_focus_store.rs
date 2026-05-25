@@ -2,8 +2,8 @@ use std::collections::BTreeMap;
 
 use ahash::AHashMap;
 
-use tersse::pure::focus_key::FocusKey;
-use tersse::pure::focus_store::{btree_get, btree_rekey, btree_remove, btree_upsert};
+use tersse::pure_test::focus_key::FocusKey;
+use tersse::pure_test::focus_store::{btree_get, btree_rekey, btree_remove, btree_upsert};
 
 #[test]
 fn btree_upsert_remove_and_rekey_are_logarithmic_map_ops() {

@@ -1,9 +1,9 @@
-use tersse::pure::terminal_input_batch::{
+use tersse::pure_test::terminal_input_batch::{
     analyze_batch_redraw_semantics, coalesced_burst_guarantees_single_redraw,
     guarantees_single_coalesced_paste_redraw, merge_poll_batches, single_pending_paste_flush,
     BatchPoll, PendingPasteBuffer,
 };
-use tersse::pure::terminal_poll_coalesce::{
+use tersse::pure_test::terminal_poll_coalesce::{
     coalesce_terminal_poll_items, TerminalPollItem,
 };
 

@@ -1,4 +1,4 @@
-use tersse::pure::element_placement::{
+use tersse::pure_test::element_placement::{
     default_child_location, descendant_ids, rectangles_overlap, resolve_absolute_location,
     resolve_overlap_location, ElementBounds, ElementPlacement, ParentSide,
 };

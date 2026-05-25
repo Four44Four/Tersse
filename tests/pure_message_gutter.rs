@@ -1,4 +1,4 @@
-use tersse::pure::message_gutter::{
+use tersse::pure_test::message_gutter::{
     apply_message, clamp_screen_scroll_up_reveal_with_gutter, clamp_screen_scroll_with_gutter,
     clip_cols_to_avoid_wrapping_into_row, element_row_intersects_gutter_screen_rows,
     gutter_rows_to_restore, gutter_screen_rows, hide_message, layout_message_gutter_lines,
@@ -89,7 +89,7 @@ fn gutter_rows_to_restore_only_returns_rows_dropped_on_shrink() {
 
 #[test]
 fn bottom_gutter_screen_rows_stay_within_visible_content() {
-    use tersse::pure::terminal_bounds::{content_max_y, row_is_visible};
+    use tersse::pure_test::terminal_bounds::{content_max_y, row_is_visible};
 
     for height in 1..=5 {
         let rows = gutter_screen_rows(MsgGutterSide::Bottom, height, 23);

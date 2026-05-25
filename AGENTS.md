@@ -14,3 +14,5 @@
        - Don't run the examples fuzzing
     - If any are identified:
        - Fix them without compromising functionality or specifications
+ - If a function needs to be exposed as API to be used in a test and solely in a test:
+    - Move it to a dedicated file/directory to avoid cluttering implementation files

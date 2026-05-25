@@ -1,6 +1,6 @@
 use std::time::{Duration, Instant};
 
-use tersse::pure::resize_debounce::{debounce_deadline, debounce_has_elapsed};
+use tersse::pure_test::resize_debounce::{debounce_deadline, debounce_has_elapsed};
 
 #[test]
 fn debounce_has_elapsed_after_window() {

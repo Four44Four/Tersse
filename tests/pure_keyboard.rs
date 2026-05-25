@@ -1,4 +1,4 @@
-use tersse::pure::keyboard::arrow_extend_selection;
+use tersse::pure_test::keyboard::arrow_extend_selection;
 
 #[test]
 fn shift_extends_selection() {

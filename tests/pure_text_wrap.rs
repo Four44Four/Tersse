@@ -1,5 +1,5 @@
 use std::collections::BTreeSet;
-use tersse::pure::text_wrap::{
+use tersse::pure_test::text_wrap::{
     cursor_display_position, display_row_count, selection_highlight_cells, wrapped_line_count,
     wrapped_lines, wrapped_lines_for_display,
 };
@@ -65,7 +65,7 @@ fn cursor_at_right_edge_when_visual_line_is_full() {
 
 #[test]
 fn scrolled_viewport_row_count_does_not_exceed_remaining_content() {
-    use tersse::pure::scroll_view::{clamp_scroll_offset, visible_line_range};
+    use tersse::pure_test::scroll_view::{clamp_scroll_offset, visible_line_range};
     let total_lines = 30;
     let terminal_visible = 24;
     let offset = clamp_scroll_offset(11, total_lines, terminal_visible);

@@ -65,11 +65,11 @@ impl ElementStore {
     }
 
     pub fn len(&self) -> usize {
-        self.store.len()
+        self.store.iter().count()
     }
 
     pub fn is_empty(&self) -> bool {
-        self.store.is_empty()
+        self.store.iter().next().is_none()
     }
 
     fn allocate_id(&mut self) -> usize {

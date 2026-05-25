@@ -73,7 +73,7 @@ pub fn runtime_render_height_for_element_text(text: &str, width: usize) -> usize
 
 #[cfg(feature = "test-api")]
 pub fn runtime_clamp_fixed_height(height: usize) -> usize {
-    types::clamp_fixed_height(height)
+    height.max(1)
 }
 
 #[cfg(feature = "test-api")]

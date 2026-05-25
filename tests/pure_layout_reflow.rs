@@ -1,4 +1,4 @@
-use tersse::pure::layout_reflow::{height_delta, min_y_after_change, shifted_y};
+use tersse::pure_test::layout_reflow::{height_delta, min_y_after_change, shifted_y};
 
 #[test]
 fn height_delta_reports_growth_and_shrink() {

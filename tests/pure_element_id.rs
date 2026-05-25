@@ -1,4 +1,4 @@
-use tersse::pure::element_id::{advance_element_id, allocate_element_id};
+use tersse::pure_test::element_id::{advance_element_id, allocate_element_id};
 
 #[test]
 fn advance_element_id_wraps_on_overflow() {

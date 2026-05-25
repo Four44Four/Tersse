@@ -1,4 +1,4 @@
-use tersse::pure::terminal_bounds::{
+use tersse::pure_test::terminal_bounds::{
     clip_height_at_terminal, clip_rect, clip_str_to_cols, cols_for_printing, cols_visible_from,
     content_max_y, drawable_rows_in_span, element_intersects_terminal_viewport,
     max_element_row_cols, row_is_visible, rows_visible_from, text_input_draw_line_indices,

@@ -1,4 +1,4 @@
-use tersse::pure::button::{padding_cols, truncate_label};
+use tersse::pure_test::button::{padding_cols, truncate_label};
 
 #[test]
 fn truncates_long_label() {

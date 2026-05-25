@@ -2,9 +2,9 @@ use std::cmp::Ordering;
 
 /// Sort key for focus-ordered TUI elements: `(focus_number, id)`.
 #[derive(Clone, Debug)]
-pub(crate) struct FocusKey {
-    pub(crate) focus_number: f64,
-    pub(crate) id: usize,
+pub struct FocusKey {
+    pub focus_number: f64,
+    pub id: usize,
 }
 
 impl PartialEq for FocusKey {
@@ -16,7 +16,7 @@ impl PartialEq for FocusKey {
 impl Eq for FocusKey {}
 
 impl FocusKey {
-    pub(crate) fn new(focus_number: f64, id: usize) -> Self {
+    pub fn new(focus_number: f64, id: usize) -> Self {
         Self { focus_number, id }
     }
 }

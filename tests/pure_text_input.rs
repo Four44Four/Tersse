@@ -1,4 +1,4 @@
-use tersse::pure::text_input::{
+use tersse::pure_test::text_input::{
     backspace, clamp_state_to_max_rows, copy_selection, cursor_left, cursor_right, cut_selection,
     insert_char, insert_newline, paste_text, selection_range, state_fits_in_max_rows,
     truncate_text_to_max_rows, TextInputState,
