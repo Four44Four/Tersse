@@ -1,11 +1,9 @@
 # Run docker memory test
 ## Build
- - `docker build -t tersse-valgrind .`
+- `docker build -t tersse-valgrind .`
 ## Run
- - `docker run --rm tersse-valgrind`
-## Run with args passed
- - `docker run --rm tersse-valgrind -- --nocapture`
- - `docker run --rm tersse-valgrind pure_button`
+- Tests (default): `docker run --rm tersse-valgrind tests`
+- Examples fuzz: `docker run --rm tersse-valgrind examples`
 
 # Run examples
  - `cargo run --bin <example-name>`

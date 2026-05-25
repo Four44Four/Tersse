@@ -11,5 +11,6 @@
  - Do not add any features that allow for scheduling based on UI event loop
  - Whenever new tests are implemented or tests are modified:
     - Run the Dockerfile to test all tests for memory leaks
+       - Don't run the examples fuzzing
     - If any are identified:
        - Fix them without compromising functionality or specifications

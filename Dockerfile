@@ -5,6 +5,7 @@ RUN apt-get update \
         build-essential \
         ca-certificates \
         curl \
+        bsdutils \
         libncurses-dev \
         pkg-config \
         valgrind \
@@ -21,8 +22,10 @@ WORKDIR /app
 
 COPY . .
 
-RUN sed -i 's/\r$//' docker/run-valgrind-tests.sh \
-    && chmod +x docker/run-valgrind-tests.sh \
-    && cargo test --tests --no-run
+RUN sed -i 's/\r$//' docker/entrypoint.sh docker/run-valgrind-tests.sh docker/run-valgrind-examples.sh \
+    && chmod +x docker/entrypoint.sh docker/run-valgrind-tests.sh docker/run-valgrind-examples.sh \
+    && cargo test --tests --no-run \
+    && cargo build --bins
 
-CMD ["docker/run-valgrind-tests.sh"]
+ENTRYPOINT ["/app/docker/entrypoint.sh"]
+CMD ["tests"]
