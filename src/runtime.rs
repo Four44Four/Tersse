@@ -3,8 +3,6 @@ use std::time::Instant;
 
 use pancurses::Window;
 
-use crate::ScreenTitle;
-
 mod colors;
 mod core;
 #[cfg(debug_draw_do_delay)]
@@ -85,7 +83,6 @@ pub fn runtime_text_input_state_snapshot(
 
 pub struct RuntimeUi {
     win: Window,
-    title: Option<ScreenTitle>,
     elements: ElementStore,
     focused_position: usize,
     pair_cache: AHashMap<(i16, i16), i16>,

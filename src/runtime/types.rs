@@ -42,6 +42,7 @@ pub struct ElementConfig {
     pub focus_number: f64,
     pub text: String,
     pub style: FocusStyle,
+    pub unfocusable: bool,
     pub on_activate: Option<ElementHandler>,
     pub text_input: Option<TextInputBehavior>,
 }
@@ -52,6 +53,9 @@ pub(super) enum UiEvent {
 }
 
 pub type ElementHandler = Box<dyn FnMut(&mut RuntimeUi) + 'static>;
+
+/// Focus order key assigned to elements that cannot receive keyboard focus.
+pub(crate) const UNFOCUSABLE_FOCUS_NUMBER: f64 = f64::INFINITY;
 
 impl ElementConfig {
     pub fn new(
@@ -67,6 +71,25 @@ impl ElementConfig {
             focus_number,
             text: String::new(),
             style,
+            unfocusable: false,
+            on_activate: None,
+            text_input: None,
+        }
+    }
+
+    pub fn new_unfocusable(
+        placement: ElementPlacement,
+        width: usize,
+        style: FocusStyle,
+    ) -> Self {
+        Self {
+            placement,
+            width: width.max(1),
+            height_mode: ElementHeightMode::FitContent,
+            focus_number: UNFOCUSABLE_FOCUS_NUMBER,
+            text: String::new(),
+            style,
+            unfocusable: true,
             on_activate: None,
             text_input: None,
         }
@@ -99,6 +122,14 @@ impl ElementConfig {
 
     pub fn with_text_input(mut self, text_input: TextInputBehavior) -> Self {
         self.text_input = Some(text_input);
+        self
+    }
+
+    pub fn with_unfocusable(mut self, unfocusable: bool) -> Self {
+        self.unfocusable = unfocusable;
+        if unfocusable {
+            self.focus_number = UNFOCUSABLE_FOCUS_NUMBER;
+        }
         self
     }
 }
@@ -134,6 +165,7 @@ pub(super) struct RuntimeElement {
     pub scroll: usize,
     pub text: String,
     pub focused: bool,
+    pub unfocusable: bool,
     pub style: FocusStyle,
     pub on_activate: Option<ElementHandler>,
     pub text_input: Option<RuntimeTextInput>,
@@ -184,6 +216,7 @@ impl RuntimeElement {
             scroll: 0,
             text: config.text,
             focused: false,
+            unfocusable: config.unfocusable,
             style: config.style,
             on_activate: config.on_activate,
             text_input: config.text_input.map(|behavior| RuntimeTextInput {
@@ -204,6 +237,9 @@ impl RuntimeElement {
     }
 
     pub fn set_focus_number(&mut self, focus_number: f64) {
+        if self.unfocusable {
+            return;
+        }
         self.focus_number = focus_number;
     }
 

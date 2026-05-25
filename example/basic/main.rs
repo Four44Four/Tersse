@@ -9,7 +9,7 @@ use tersse::prelude::*;
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
 
-use style::{button_style, locked_like_style, screen_title, text_element_style, text_input_style};
+use style::{button_style, locked_like_style, text_display_style, text_element_style, text_input_style};
 
 const FLASH_FOO: Duration = Duration::from_secs(2);
 const FLASH_BAR: Duration = Duration::from_secs(5);
@@ -192,7 +192,11 @@ fn main() {
     let session = ui.ui_session();
     let app: Rc<RefCell<Option<App>>> = Rc::new(RefCell::new(None));
 
-    ui.set_title(screen_title());
+    let _title_id = ui.create_element(static_text_display_unfocusable_fit_width(
+        ElementPlacement::absolute(Location { x: 0, y: 0 }),
+        text_display_style(),
+        "Hello world",
+    ));
 
     let foo_app = Rc::clone(&app);
     let foo_runtime = runtime.clone();

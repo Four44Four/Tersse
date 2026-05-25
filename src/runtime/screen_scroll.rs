@@ -79,7 +79,7 @@ impl RuntimeUi {
                 (y, height)
             })
             .collect::<Vec<_>>();
-        let content_height = screen_scroll::screen_content_height(self.title.is_some(), &spans);
+        let content_height = screen_scroll::screen_content_height(&spans);
         (content_height, viewport_height)
     }
 

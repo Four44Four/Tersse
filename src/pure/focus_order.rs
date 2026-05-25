@@ -53,6 +53,15 @@ pub fn keyboard_redraw_element_ids(previous: Option<usize>, current: Option<usiz
     }
 }
 
+/// Returns ids from `order` that are eligible for keyboard focus.
+pub fn focusable_order_ids(order: &[usize], is_unfocusable: impl Fn(usize) -> bool) -> Vec<usize> {
+    order
+        .iter()
+        .copied()
+        .filter(|id| !is_unfocusable(*id))
+        .collect()
+}
+
 /// Moves focus backward, staying on the first element when already there.
 pub fn prev_index(current: usize, len: usize) -> usize {
     if len == 0 {

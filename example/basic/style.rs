@@ -1,19 +1,19 @@
-use tersse::{
-    set_title_of_current_screen, Color, FocusStyle, ScreenTitle, Style, TextInputStyle,
-    TitleAlignment,
-};
+use tersse::{Color, FocusStyle, Style, TextInputStyle};
 
-pub fn screen_title() -> ScreenTitle {
-    set_title_of_current_screen(
-        "Hello world",
-        TitleAlignment::Left,
-        Color::White,
-        Color::Black,
-    )
+pub fn text_display_style() -> FocusStyle {
+    FocusStyle {
+        focused: Style {
+            fg: Color::White,
+            bg: Color::Black,
+        },
+        unfocused: Style {
+            fg: Color::White,
+            bg: Color::Black,
+        },
+    }
 }
 
-pub fn button_style() -> FocusStyle {
-    FocusStyle {
+pub fn button_style() -> FocusStyle {    FocusStyle {
         focused: Style {
             fg: Color::Black,
             bg: Color::Cyan,

@@ -4,8 +4,8 @@ use tersse::pure::message_gutter::{
     hide_message, layout_message_gutter_lines, max_screen_scroll_offset, message_gutter_height,
     padding_screen_rows, ratchet_gutter_scroll_cap_on_up, row_printing_wraps_into_gutter_block,
     screen_scroll_shows_padding, scroll_screen_down_with_gutter,
-    should_hide_gutter_by_scroll_reveal, title_intersects_gutter_screen_rows,
-    viewport_height_for_screen_scroll, MessageGutterState, MsgGutterSide,
+    should_hide_gutter_by_scroll_reveal, viewport_height_for_screen_scroll, MessageGutterState,
+    MsgGutterSide,
 };
 
 #[test]
@@ -135,12 +135,6 @@ fn element_intersection_uses_screen_scroll_offset() {
         rows.clone()
     ));
     assert!(element_row_intersects_gutter_screen_rows(3, 1, 3, rows));
-}
-
-#[test]
-fn title_intersection_accounts_for_screen_scroll() {
-    assert!(title_intersects_gutter_screen_rows(true, 0, 0..1));
-    assert!(!title_intersects_gutter_screen_rows(true, 1, 0..1));
 }
 
 #[test]

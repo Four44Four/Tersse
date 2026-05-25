@@ -201,19 +201,6 @@ pub fn element_row_intersects_gutter_screen_rows(
     false
 }
 
-/// Whether the screen title occupies any row in `screen_rows` at the current scroll offset.
-pub fn title_intersects_gutter_screen_rows(
-    has_title: bool,
-    screen_scroll: usize,
-    screen_rows: std::ops::Range<i32>,
-) -> bool {
-    if !has_title {
-        return false;
-    }
-    let title_screen_y = 0i32 - screen_scroll as i32;
-    screen_rows.contains(&title_screen_y)
-}
-
 /// Viewport row count available for scrolling content while the gutter is visible.
 ///
 /// The message gutter is fixed to the bottom of the terminal (screen space). Those rows are not

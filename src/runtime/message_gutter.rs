@@ -286,16 +286,6 @@ impl RuntimeUi {
             }
         }
 
-        if message_gutter::title_intersects_gutter_screen_rows(
-            self.title.is_some(),
-            self.screen_scroll,
-            screen_rows.clone(),
-        ) {
-            if let Some(title) = self.title.clone() {
-                self.draw_title(title);
-            }
-        }
-
         let draw_order: Vec<usize> = self.elements.focus_order_ids();
         for id in draw_order {
             let element_id = ElementId::from_internal(id);

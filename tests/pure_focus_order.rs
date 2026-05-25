@@ -1,6 +1,6 @@
 use tersse::pure::focus_order::{
-    index_for_focused_id, keyboard_redraw_element_ids, next_index, normalize_index, prev_index,
-    sorted_ids,
+    focusable_order_ids, index_for_focused_id, keyboard_redraw_element_ids, next_index,
+    normalize_index, prev_index, sorted_ids,
 };
 
 #[test]
@@ -59,6 +59,15 @@ fn prev_index_retreats_until_first_element() {
 #[test]
 fn prev_index_stays_on_first_element() {
     assert_eq!(prev_index(0, 3), 0);
+}
+
+#[test]
+fn focusable_order_ids_skips_unfocusable_elements() {
+    let order = vec![0, 1, 2, 3];
+    let unfocusable = |id: usize| id == 1 || id == 3;
+    assert_eq!(focusable_order_ids(&order, unfocusable), vec![0, 2]);
+    assert_eq!(focusable_order_ids(&order, |_| false), order);
+    assert_eq!(focusable_order_ids(&[], |_| true), Vec::<usize>::new());
 }
 
 #[test]

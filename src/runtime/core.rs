@@ -10,7 +10,6 @@ use tokio::sync::oneshot;
 use crate::pure::message_gutter::MessageGutterState;
 use crate::terminal_input;
 use crate::terminal_input::{TerminalKey, TerminalPoll};
-use crate::ScreenTitle;
 
 use super::element_store::ElementStore;
 use super::types::UiEvent;
@@ -111,7 +110,6 @@ impl RuntimeUi {
 
         let mut ui = Self {
             win,
-            title: None,
             elements: ElementStore::new(),
             focused_position: 0,
             pair_cache: AHashMap::new(),
@@ -139,14 +137,6 @@ impl RuntimeUi {
         };
         let _ = ui.reload_screen_after_resize();
         ui
-    }
-
-    pub fn set_title(&mut self, title: ScreenTitle) {
-        self.title = Some(title);
-    }
-
-    pub fn clear_title(&mut self) {
-        self.title = None;
     }
 
     /// Returns a cloneable handle for queueing UI updates from other threads.

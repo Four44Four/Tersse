@@ -63,6 +63,29 @@ pub fn static_text_fit_height(
         .with_text(text)
 }
 
+/// Unfocusable static read-only text with fixed width and single-row height.
+pub fn static_text_display_unfocusable(
+    placement: ElementPlacement,
+    width: usize,
+    style: FocusStyle,
+    text: impl Into<String>,
+) -> ElementConfig {
+    ElementConfig::new_unfocusable(placement, width, style)
+        .with_fixed_height(1)
+        .with_text(text)
+}
+
+/// Unfocusable static read-only text whose width is sized to the label text.
+pub fn static_text_display_unfocusable_fit_width(
+    placement: ElementPlacement,
+    style: FocusStyle,
+    text: impl Into<String>,
+) -> ElementConfig {
+    let text = text.into();
+    let width = text.chars().count().max(1);
+    static_text_display_unfocusable(placement, width, style, text)
+}
+
 /// Text input with fixed width and height; overflow is clipped and scrollable with
 /// Alt/Meta + Up/Down while focused.
 pub fn text_input_fixed(

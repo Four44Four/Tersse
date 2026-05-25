@@ -9,7 +9,6 @@ use crate::pure::text_input::{self, TextInputState};
 use crate::pure::text_wrap;
 use crate::pure::ui_redraw;
 use crate::ElementId;
-use crate::TitleAlignment;
 use pancurses::{curs_set, COLOR_PAIR};
 
 use super::types::ElementHeightMode;
@@ -69,10 +68,6 @@ impl RuntimeUi {
             self.clear_screen_for_draw();
         } else {
             self.win.erase();
-        }
-
-        if let Some(title) = &self.title {
-            self.draw_title(title.clone());
         }
 
         let draw_order: Vec<usize> = self.elements.focus_order_ids();
@@ -236,27 +231,6 @@ impl RuntimeUi {
         } else {
             self.draw_button(id);
         }
-    }
-
-    pub(in crate::runtime) fn draw_title(&mut self, title: crate::ScreenTitle) {
-        let pair = self.color_pair(title.fg_color, title.bg_color);
-        let max_x = self.win.get_max_x().max(1);
-        let text_len = title.text.chars().count() as i32;
-        let col = match title.alignment {
-            TitleAlignment::Left => 0,
-            TitleAlignment::Right => (max_x - text_len).max(0),
-            TitleAlignment::Center => ((max_x - text_len) / 2).max(0),
-        };
-        self.win.attron(COLOR_PAIR(pair as u64));
-        let title_y = self.scrolled_y(0);
-        if !terminal_bounds::row_is_visible(title_y, self.win.get_max_y())
-            || self.is_message_gutter_screen_row(title_y)
-        {
-            return;
-        }
-        self.win.mv(title_y, col);
-        self.win.addstr(&title.text);
-        self.win.attroff(COLOR_PAIR(pair as u64));
     }
 
     fn draw_button(&mut self, id: usize) {

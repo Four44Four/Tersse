@@ -28,6 +28,9 @@ impl ElementStore {
     }
 
     pub fn set_focus_number(&mut self, id: usize, focus_number: f64) -> bool {
+        if self.get(id).is_some_and(|element| element.unfocusable) {
+            return false;
+        }
         self.store
             .set_focus_number(id, focus_number, |element, next| {
                 element.set_focus_number(next);
@@ -52,5 +55,13 @@ impl ElementStore {
 
     pub fn focus_order_ids(&self) -> Vec<usize> {
         self.store.focus_order_ids()
+    }
+
+    pub fn focusable_order_ids(&self) -> Vec<usize> {
+        self.store
+            .focus_order_ids()
+            .into_iter()
+            .filter(|id| !self.get(*id).is_some_and(|element| element.unfocusable))
+            .collect()
     }
 }

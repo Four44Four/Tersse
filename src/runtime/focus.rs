@@ -23,7 +23,7 @@ impl RuntimeUi {
     }
 
     fn focus_order(&self) -> Vec<usize> {
-        self.elements.focus_order_ids()
+        self.elements.focusable_order_ids()
     }
 
     pub(super) fn current_focused_id(&self) -> Option<ElementId> {

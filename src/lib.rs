@@ -13,8 +13,9 @@ mod terminal_input;
 
 pub use constants::UI_REDRAW_DEBOUNCE_QUEUE_UPDATE_MS;
 pub use element_presets::{
-    button, button_fit_width, static_text_fit_height, static_text_fixed, text_input_fit_height,
-    text_input_fixed,
+    button, button_fit_width, static_text_display_unfocusable,
+    static_text_display_unfocusable_fit_width, static_text_fit_height, static_text_fixed,
+    text_input_fit_height, text_input_fixed,
 };
 pub use element_store::{ElementId, ElementStore, StoredElement};
 pub use pure::element_placement::{ElementBounds, ElementPlacement, ParentSide};
@@ -27,10 +28,11 @@ pub use runtime::{
 
 pub mod prelude {
     pub use crate::{
-        button, button_fit_width, static_text_fit_height, static_text_fixed, text_input_fit_height,
-        text_input_fixed, Color, ElementConfig, ElementHandler, ElementHeightMode, ElementId,
-        ElementPlacement, FocusStyle, Location, ParentSide, RuntimeUi, Style, TextInputBehavior,
-        TextInputStyle, UiRuntime, UiSession,
+        button, button_fit_width, static_text_display_unfocusable,
+        static_text_display_unfocusable_fit_width, static_text_fit_height, static_text_fixed,
+        text_input_fit_height, text_input_fixed, Color, ElementConfig, ElementHandler,
+        ElementHeightMode, ElementId, ElementPlacement, FocusStyle, Location, ParentSide,
+        RuntimeUi, Style, TextInputBehavior, TextInputStyle, UiRuntime, UiSession,
     };
 }
 
@@ -70,21 +72,6 @@ pub struct Element {
     pub text: String,
     pub focused: bool,
     pub text_input: Option<TextInputProperty>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ScreenTitle {
-    pub text: String,
-    pub alignment: TitleAlignment,
-    pub fg_color: Color,
-    pub bg_color: Color,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum TitleAlignment {
-    Left,
-    Right,
-    Center,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -199,19 +186,4 @@ pub fn delete_focused_tui_element(
         return Err(DeleteElementError::NoFocusedElement);
     };
     store.remove(id).ok_or(DeleteElementError::NoFocusedElement)
-}
-
-/// Sets title of the current screen.
-pub fn set_title_of_current_screen(
-    text_string: impl Into<String>,
-    alignment: TitleAlignment,
-    fg_color: Color,
-    bg_color: Color,
-) -> ScreenTitle {
-    ScreenTitle {
-        text: text_string.into(),
-        alignment,
-        fg_color,
-        bg_color,
-    }
 }

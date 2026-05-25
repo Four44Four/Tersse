@@ -6,8 +6,8 @@ use crate::pure::terminal_bounds;
 /// Total content height in rows from the top of the screen (0-based exclusive end).
 ///
 /// `element_spans` lists each element's anchor row and logical height in rows.
-pub fn screen_content_height(has_title: bool, element_spans: &[(u16, usize)]) -> usize {
-    let mut height = if has_title { 1 } else { 0 };
+pub fn screen_content_height(element_spans: &[(u16, usize)]) -> usize {
+    let mut height = 0;
     for &(y, h) in element_spans {
         height = height.max(y as usize + h);
     }

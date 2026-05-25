@@ -4,11 +4,10 @@ use tersse::pure::screen_scroll::{
 };
 
 #[test]
-fn screen_content_height_includes_title_and_tallest_element() {
-    assert_eq!(screen_content_height(false, &[]), 0);
-    assert_eq!(screen_content_height(true, &[]), 1);
-    assert_eq!(screen_content_height(false, &[(2, 1), (5, 3)]), 8);
-    assert_eq!(screen_content_height(true, &[(10, 5)]), 15);
+fn screen_content_height_uses_tallest_element() {
+    assert_eq!(screen_content_height(&[]), 0);
+    assert_eq!(screen_content_height(&[(2, 1), (5, 3)]), 8);
+    assert_eq!(screen_content_height(&[(10, 5)]), 15);
 }
 
 #[test]
