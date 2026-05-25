@@ -25,8 +25,13 @@ pancurses = { version = "0.17", features = ["win32"] }
 pancurses = "0.17"
 
 [profile.release]
-lto = true
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
 strip = true
+debug = false
+incremental = false
 
 [[bin]]
 name = "basic_example"
