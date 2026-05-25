@@ -48,7 +48,7 @@ pub enum DebugDrawDelayColor {
 /// show a solid placeholder rectangle before drawing the real element. Requires a rebuild
 /// after changing this value (`build.rs` reads it at compile time).
 #[allow(dead_code)]
-pub const DEBUG_SHOULD_DRAW_DO_DELAY: bool = false;
+pub const DEBUG_SHOULD_DRAW_DO_DELAY: bool = true;
 
 /// Placeholder rectangle background color when [`DEBUG_SHOULD_DRAW_DO_DELAY`] is `true`.
 #[allow(dead_code)]

@@ -34,5 +34,9 @@ debug = false
 incremental = false
 
 [[bin]]
+name = "reflow_example"
+path = "example/reflow/main.rs"
+
+[[bin]]
 name = "basic_example"
 path = "example/basic/main.rs"

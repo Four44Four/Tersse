@@ -13,8 +13,7 @@ pub fn text_display_style() -> FocusStyle {
     }
 }
 
-pub fn button_style() -> FocusStyle {
-    FocusStyle {
+pub fn button_style() -> FocusStyle {    FocusStyle {
         focused: Style {
             fg: Color::Black,
             bg: Color::Cyan,
@@ -25,6 +24,32 @@ pub fn button_style() -> FocusStyle {
         },
     }
 }
+
+pub fn locked_like_style() -> FocusStyle {
+    FocusStyle {
+        focused: Style {
+            fg: Color::Red,
+            bg: Color::White,
+        },
+        unfocused: Style {
+            fg: Color::Yellow,
+            bg: Color::Black,
+        },
+    }
+}
+
+// pub fn neutral_display_style() -> FocusStyle {
+//     FocusStyle {
+//         focused: Style {
+//             fg: Color::White,
+//             bg: Color::Black,
+//         },
+//         unfocused: Style {
+//             fg: Color::White,
+//             bg: Color::Black,
+//         },
+//     }
+// }
 
 pub fn text_input_style() -> TextInputStyle {
     TextInputStyle {
