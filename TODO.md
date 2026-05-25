@@ -1,6 +1,6 @@
 # Sprint 1
- - dockerization in debian container with valgrind
-    - run valgrind memory tests inside of container
+ - Specify text input behavior on input
+ - Specify API names and surface
  - prepare for uploading to crate.io
 
 # Sprint 2

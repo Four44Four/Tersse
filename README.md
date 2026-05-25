@@ -1,5 +1,5 @@
 # Purpose
- - Rust based stupid and simple file management TUI library
+ - Rust based stupid and simple TUI library
 
 # Intended Features
  - Buttons
