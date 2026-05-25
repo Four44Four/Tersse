@@ -1,6 +1,3 @@
-# Sprint 1
- - prepare for uploading to crate.io
-
 # Sprint 2
  - Screens
  - Message screen
