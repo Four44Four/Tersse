@@ -24,9 +24,16 @@
  - When the message gutter is displayed on the bottom:
     - The screen scrolling can scroll down further to reveal the covered elements
     - When the message gutter is hidden after scrolling down further due to message gutter allowing so:
-       - The scroll position will **not** change
+       - The (visual) scroll position will **not** change
        - The space below the end of the screen before will be filled by the default background color (black?)
        - When the user scrolls up again, any extra area that was left by the hiding of the message gutter that is now hidden due to the scrolling up will not be accessible again by scrolling down
           - Unless the message gutter once again covers up part of the original screen
+       - The message gutter should only be hidden by the message gutter expiration duration, *not* on keyboard input or scrolling
  - When the message gutter is displayed on the top:
     - Do the same as the when the message gutter is displayed on the top, but add extra scrolling space to the top of the screen that displays the same behavior, just in the opposite end of the screen's scrollable space (on the top instead of on the bottom)
+    - When the message gutter is hidden and the user scrolls down while the extra space is visible:
+       - Remove the now hidden extra lines of space produced by the message gutter while preserving the scroll position (change it if necessary) so that it seems like the lines above the screen are disappearing seamlessly without causing erratic changes in scroll position as they are removed
+       - The message gutter should only be hidden by the message gutter expiration duration, *not* on keyboard input or scrolling
+ - For both message gutter display sides:
+    - Only redraw message gutters if they are being drawn initially, updated, or hidden
+    - Do not redraw them while they are displayed and static

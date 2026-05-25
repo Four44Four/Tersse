@@ -94,6 +94,8 @@ pub struct RuntimeUi {
     redraw_debounce_until: Option<Instant>,
     last_terminal_yx: Option<(i32, i32)>,
     screen_scroll: usize,
+    /// Upward reveal offset while the top message gutter is visible or after a scroll-reveal hide.
+    screen_scroll_up_reveal: usize,
     ui_queue: ui_session::UiQueue,
     ui_signal_tx: ui_session::UiSignalSender,
     ui_signal_rx: ui_session::UiSignalReceiver,
@@ -109,4 +111,6 @@ pub struct RuntimeUi {
     message_gutter_expires_at: Option<Instant>,
     /// Max screen scroll after the gutter was dismissed by scrolling to reveal content.
     message_gutter_reveal_scroll_cap: Option<usize>,
+    /// True when this terminal batch already scrolled content up toward document top.
+    screen_scrolled_toward_document_top_this_batch: bool,
 }

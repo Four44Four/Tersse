@@ -121,6 +121,7 @@ impl RuntimeUi {
             redraw_debounce_until: None,
             last_terminal_yx: None,
             screen_scroll: 0,
+            screen_scroll_up_reveal: 0,
             ui_queue,
             ui_signal_tx,
             ui_signal_rx,
@@ -134,6 +135,7 @@ impl RuntimeUi {
             message_gutter: MessageGutterState::default(),
             message_gutter_expires_at: None,
             message_gutter_reveal_scroll_cap: None,
+            screen_scrolled_toward_document_top_this_batch: false,
         };
         let _ = ui.reload_screen_after_resize();
         ui
@@ -230,6 +232,8 @@ impl RuntimeUi {
         if batch.is_empty() {
             return UiEvent::None;
         }
+
+        self.screen_scrolled_toward_document_top_this_batch = false;
 
         let keyboard_input = batch.iter().any(|poll| {
             matches!(poll, TerminalPoll::Paste(_) | TerminalPoll::Key(_))

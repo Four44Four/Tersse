@@ -1,11 +1,13 @@
 use tersse::pure::message_gutter::{
-    apply_message, clamp_screen_scroll_with_gutter, clip_cols_to_avoid_wrapping_into_row,
-    element_row_intersects_gutter_screen_rows, gutter_rows_to_restore, gutter_screen_rows,
-    hide_message, layout_message_gutter_lines, max_screen_scroll_offset, message_gutter_height,
-    padding_screen_rows, ratchet_gutter_scroll_cap_on_up, row_printing_wraps_into_gutter_block,
-    screen_scroll_shows_padding, scroll_screen_down_with_gutter,
-    should_hide_gutter_by_scroll_reveal, viewport_height_for_screen_scroll, MessageGutterState,
-    MsgGutterSide,
+    apply_message, clamp_screen_scroll_up_reveal_with_gutter, clamp_screen_scroll_with_gutter,
+    clip_cols_to_avoid_wrapping_into_row, element_row_intersects_gutter_screen_rows,
+    gutter_rows_to_restore, gutter_screen_rows, hide_message, layout_message_gutter_lines,
+    max_screen_scroll_offset, max_screen_scroll_up_reveal, message_gutter_height,
+    padding_screen_rows, ratchet_gutter_scroll_cap_on_up, ratchet_gutter_up_reveal_cap_on_down,
+    row_printing_wraps_into_gutter_block, screen_scroll_shows_padding,
+    screen_scroll_shows_top_padding, scroll_screen_down_with_gutter, scroll_screen_up_with_gutter,
+    should_hide_gutter_by_scroll_reveal, top_padding_screen_rows,
+    viewport_height_for_screen_scroll, MessageGutterState, MsgGutterSide,
 };
 
 #[test]
@@ -126,30 +128,44 @@ fn element_intersection_uses_screen_scroll_offset() {
         0,
         1,
         0,
+        0,
         rows.clone()
     ));
     assert!(!element_row_intersects_gutter_screen_rows(
         2,
         1,
         0,
+        0,
         rows.clone()
     ));
-    assert!(element_row_intersects_gutter_screen_rows(3, 1, 3, rows));
+    assert!(element_row_intersects_gutter_screen_rows(3, 1, 3, 0, rows));
 }
 
 #[test]
-fn viewport_height_shrinks_when_bottom_gutter_visible() {
+fn viewport_height_shrinks_when_gutter_visible() {
     assert_eq!(viewport_height_for_screen_scroll(24, true, 3, MsgGutterSide::Bottom), 21);
     assert_eq!(viewport_height_for_screen_scroll(24, true, 0, MsgGutterSide::Bottom), 24);
-    assert_eq!(viewport_height_for_screen_scroll(24, true, 3, MsgGutterSide::Top), 24);
+    assert_eq!(viewport_height_for_screen_scroll(24, true, 3, MsgGutterSide::Top), 21);
     assert_eq!(viewport_height_for_screen_scroll(24, false, 3, MsgGutterSide::Bottom), 24);
 }
 
 #[test]
-fn scroll_reveal_does_not_hide_at_normal_scroll_end() {
-    assert!(!should_hide_gutter_by_scroll_reveal(6, 30, 24, 3, MsgGutterSide::Bottom));
-    assert!(!should_hide_gutter_by_scroll_reveal(6, 30, 24, 0, MsgGutterSide::Bottom));
-    assert!(!should_hide_gutter_by_scroll_reveal(3, 20, 24, 3, MsgGutterSide::Bottom));
+fn scroll_never_hides_message_gutter() {
+    assert!(!should_hide_gutter_by_scroll_reveal(
+        6, 0, 30, 24, 3, MsgGutterSide::Bottom
+    ));
+    assert!(!should_hide_gutter_by_scroll_reveal(
+        9, 0, 30, 24, 3, MsgGutterSide::Bottom
+    ));
+    assert!(!should_hide_gutter_by_scroll_reveal(
+        3, 0, 20, 24, 3, MsgGutterSide::Bottom
+    ));
+    assert!(!should_hide_gutter_by_scroll_reveal(
+        0, 3, 30, 24, 3, MsgGutterSide::Top
+    ));
+    assert!(!should_hide_gutter_by_scroll_reveal(
+        0, 99, 20, 24, 3, MsgGutterSide::Top
+    ));
 }
 
 #[test]
@@ -159,12 +175,6 @@ fn max_screen_scroll_uses_effective_viewport_not_double_bonus() {
     assert_eq!(max_screen_scroll_offset(30, 24, None), 6);
     assert_eq!(max_screen_scroll_offset(30, 24, Some(13)), 13);
     assert_eq!(max_screen_scroll_offset(30, 24, Some(3)), 6);
-}
-
-#[test]
-fn scroll_reveal_hides_gutter_at_base_max_plus_height() {
-    assert!(!should_hide_gutter_by_scroll_reveal(8, 30, 24, 3, MsgGutterSide::Bottom));
-    assert!(should_hide_gutter_by_scroll_reveal(9, 30, 24, 3, MsgGutterSide::Bottom));
 }
 
 #[test]
@@ -194,6 +204,45 @@ fn reveal_scroll_cap_ratchet_on_scroll_up() {
         Some(6)
     );
     assert_eq!(ratchet_gutter_scroll_cap_on_up(None, 5, base_max), None);
+}
+
+#[test]
+fn top_reveal_scroll_cap_ratchet_on_scroll_down() {
+    assert_eq!(
+        ratchet_gutter_up_reveal_cap_on_down(Some(3), 2),
+        Some(2)
+    );
+    assert_eq!(
+        ratchet_gutter_up_reveal_cap_on_down(Some(3), 0),
+        Some(0)
+    );
+    assert_eq!(ratchet_gutter_up_reveal_cap_on_down(None, 2), None);
+}
+
+#[test]
+fn top_gutter_up_reveal_and_padding() {
+    assert_eq!(max_screen_scroll_up_reveal(30, 24, true, 3, MsgGutterSide::Top, None), 3);
+    assert_eq!(
+        scroll_screen_up_with_gutter(2, 30, 24, 3, None),
+        3
+    );
+    assert_eq!(
+        clamp_screen_scroll_up_reveal_with_gutter(5, 30, 24, false, 3, MsgGutterSide::Top, Some(2)),
+        2
+    );
+    assert!(screen_scroll_shows_top_padding(0, 3, false));
+    assert!(!screen_scroll_shows_top_padding(0, 3, true));
+    assert!(screen_scroll_shows_top_padding(2, 3, false));
+    assert_eq!(top_padding_screen_rows(0, 3), 0..3);
+    assert_eq!(top_padding_screen_rows(2, 3), 0..1);
+    assert_eq!(top_padding_screen_rows(3, 3), 0..0);
+}
+
+#[test]
+fn top_padding_after_hide_only_for_bonus_reveal_not_gutter_band() {
+    assert_eq!(top_padding_screen_rows(0, 0), 0..0);
+    assert_eq!(top_padding_screen_rows(0, 3), 0..3);
+    assert_eq!(top_padding_screen_rows(2, 3), 0..1);
 }
 
 #[test]

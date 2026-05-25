@@ -79,6 +79,9 @@ impl RuntimeUi {
             .message_gutter_expires_at
             .is_some_and(|until| now < until && self.message_gutter.visible);
         let previous_height = self.message_gutter.rendered_height;
+        // New gutter messages start from the current content viewport position.
+        // Any prior top-reveal offset belongs to a previously hidden gutter cycle.
+        self.screen_scroll_up_reveal = 0;
         self.message_gutter_reveal_scroll_cap = None;
         self.message_gutter =
             message_gutter::apply_message(&self.message_gutter, message, already_visible);
@@ -94,10 +97,15 @@ impl RuntimeUi {
         if Instant::now() < until {
             return false;
         }
+        if !matches!(MSG_GUTTER_SIDE, crate::constants::MsgGutterSide::Top) {
+            self.screen_scroll_up_reveal = 0;
+        }
         self.hide_message_gutter();
         true
     }
 
+    /// Draws the gutter overlay. Call only when showing, updating, or resizing the gutter message
+    /// (`refresh_message_gutter_after_change`), not on screen scroll or full element redraws.
     pub(super) fn draw_message_gutter_overlay(&mut self) {
         if !self.message_gutter.visible {
             return;
@@ -130,31 +138,38 @@ impl RuntimeUi {
         }
     }
 
-    fn hide_message_gutter(&mut self) {
+    pub(super) fn hide_message_gutter(&mut self) {
         if !self.message_gutter.visible && self.message_gutter_expires_at.is_none() {
             return;
         }
-        let previous_height = self.message_gutter.rendered_height;
         self.message_gutter = message_gutter::hide_message(&self.message_gutter);
         self.message_gutter_expires_at = None;
         self.message_gutter_reveal_scroll_cap = None;
-        if previous_height > 0 {
-            let (max_y, _) = self.win.get_max_yx();
-            let rows = gutter_screen_rows(MSG_GUTTER_SIDE, previous_height, max_y);
-            self.restore_screen_rows(rows);
-        }
-        self.message_gutter.rendered_height = 0;
         let (base_content_height, full_viewport) = self.full_screen_scroll_bounds();
         let base_max =
             crate::pure::scroll_view::max_scroll_offset(base_content_height, full_viewport);
-        if self.screen_scroll > base_max {
-            // Preserve scroll position after hiding so post-hide padding remains visible.
-            // Future scroll-up ratchets this cap down.
-            self.message_gutter_reveal_scroll_cap = Some(self.screen_scroll);
-        } else {
-            self.message_gutter_reveal_scroll_cap = None;
+        match MSG_GUTTER_SIDE {
+            crate::constants::MsgGutterSide::Bottom => {
+                self.message_gutter.rendered_height = 0;
+                if self.screen_scroll > base_max {
+                    // Preserve scroll position after hiding so post-hide padding remains visible.
+                    // Future scroll-up ratchets this cap down.
+                    self.message_gutter_reveal_scroll_cap = Some(self.screen_scroll);
+                }
+                self.draw();
+                return;
+            }
+            crate::constants::MsgGutterSide::Top => {
+                self.message_gutter.rendered_height = 0;
+                if self.screen_scroll > base_max {
+                    self.message_gutter_reveal_scroll_cap = Some(self.screen_scroll);
+                } else if self.screen_scroll_up_reveal > 0 {
+                    self.message_gutter_reveal_scroll_cap = Some(self.screen_scroll_up_reveal);
+                }
+                self.draw();
+                return;
+            }
         }
-        self.win.refresh();
     }
 
     pub(super) fn message_gutter_layout_height(&self) -> usize {
@@ -175,6 +190,25 @@ impl RuntimeUi {
 
     pub(super) fn fill_scroll_padding_rows(&mut self) {
         let (base_content_height, full_viewport) = self.full_screen_scroll_bounds();
+        let (max_y, max_x) = self.win.get_max_yx();
+        let pair = self.color_pair(Color::Default, Color::Default);
+
+        if matches!(MSG_GUTTER_SIDE, crate::constants::MsgGutterSide::Top)
+            && message_gutter::screen_scroll_shows_top_padding(
+                self.screen_scroll,
+                self.screen_scroll_up_reveal,
+                self.message_gutter.visible,
+            )
+        {
+            let rows = message_gutter::top_padding_screen_rows(
+                self.screen_scroll,
+                self.screen_scroll_up_reveal,
+            );
+            for screen_y in rows {
+                self.fill_solid_overlay(screen_y, 0, max_x + 1, 1, pair);
+            }
+        }
+
         if !message_gutter::screen_scroll_shows_padding(
             self.screen_scroll,
             base_content_height,
@@ -183,16 +217,11 @@ impl RuntimeUi {
         ) {
             return;
         }
-        let (max_y, max_x) = self.win.get_max_yx();
         let rows = message_gutter::padding_screen_rows(
             self.screen_scroll,
             base_content_height,
             max_y,
         );
-        if rows.is_empty() {
-            return;
-        }
-        let pair = self.color_pair(Color::Default, Color::Default);
         for screen_y in rows {
             if self.is_message_gutter_screen_row(screen_y) {
                 continue;
@@ -297,6 +326,7 @@ impl RuntimeUi {
                 location.y,
                 height,
                 self.screen_scroll,
+                self.screen_scroll_up_reveal,
                 screen_rows.clone(),
             ) {
                 self.draw_existing_element(id);
