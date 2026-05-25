@@ -45,10 +45,11 @@ pub enum DebugDrawDelayColor {
 }
 
 /// When `true`, element draw/redraw paths (including fullscreen [`RuntimeUi::draw`])
-/// show a solid placeholder rectangle before drawing the real element. Requires a rebuild
-/// after changing this value (`build.rs` reads it at compile time).
+/// show a solid placeholder rectangle before drawing the real element.
+///
+/// Enabled by the `debug_should_draw_do_delay` Cargo feature.
 #[allow(dead_code)]
-pub const DEBUG_SHOULD_DRAW_DO_DELAY: bool = true;
+pub const DEBUG_SHOULD_DRAW_DO_DELAY: bool = cfg!(feature = "debug_should_draw_do_delay");
 
 /// Placeholder rectangle background color when [`DEBUG_SHOULD_DRAW_DO_DELAY`] is `true`.
 #[allow(dead_code)]

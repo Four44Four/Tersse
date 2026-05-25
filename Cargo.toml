@@ -9,6 +9,7 @@ build = "build.rs"
 [features]
 default = ["pure-tests"]
 pure-tests = []
+debug_should_draw_do_delay = []
 
 [dependencies]
 ahash = "0.8"
