@@ -54,6 +54,9 @@ pub(super) enum UiEvent {
 
 pub type ElementHandler = Box<dyn FnMut(&mut RuntimeUi) + 'static>;
 
+/// Callback invoked on the UI thread after a debounced terminal resize when dimensions change.
+pub type TerminalResizeHandler = Box<dyn FnMut(&mut RuntimeUi) + 'static>;
+
 /// Focus order key assigned to elements that cannot receive keyboard focus.
 pub(crate) const UNFOCUSABLE_FOCUS_NUMBER: f64 = f64::INFINITY;
 

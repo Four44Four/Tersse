@@ -3,7 +3,6 @@ mod style;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crossterm::terminal::size;
 use tersse::prelude::*;
 
 use style::{button_style, text_display_style, text_element_style, text_input_style};
@@ -57,13 +56,13 @@ fn centered_x(text: &str, cols: u16) -> u16 {
 }
 
 fn main() {
-    let (cols, _rows) = size().unwrap_or((80, 24));
+    let (cols, _rows) = terminal_size().unwrap_or((80, 24));
     let app: Rc<RefCell<Option<App>>> = Rc::new(RefCell::new(None));
 
     let mut ui = RuntimeUi::new();
     let session = ui.ui_session();
 
-    let _title_id = ui.create_element(static_text_display_unfocusable_fit_width(
+    let title_id = ui.create_element(static_text_display_unfocusable_fit_width(
         ElementPlacement::absolute(Location {
             x: centered_x(TITLE, cols),
             y: 0,
@@ -71,6 +70,17 @@ fn main() {
         text_display_style(),
         TITLE,
     ));
+
+    ui.register_terminal_resize_callback(move |ui| {
+        let (cols, _) = terminal_size().unwrap_or((80, 24));
+        let _ = ui.set_element_location(
+            title_id,
+            Location {
+                x: centered_x(TITLE, cols),
+                y: 0,
+            },
+        );
+    });
 
     let foo_app = Rc::clone(&app);
     let foo_id = ui.create_element(button(

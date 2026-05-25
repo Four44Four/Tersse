@@ -22,8 +22,8 @@ mod types;
 mod ui_session;
 
 pub use types::{
-    ElementConfig, ElementHandler, ElementHeightMode, FocusStyle, Style, TextInputBehavior,
-    TextInputStyle,
+    ElementConfig, ElementHandler, ElementHeightMode, FocusStyle, Style, TerminalResizeHandler,
+    TextInputBehavior, TextInputStyle,
 };
 pub use ui_session::UiSession;
 
@@ -113,4 +113,5 @@ pub struct RuntimeUi {
     message_gutter_reveal_scroll_cap: Option<usize>,
     /// True when this terminal batch already scrolled content up toward document top.
     screen_scrolled_toward_document_top_this_batch: bool,
+    terminal_resize_callbacks: Vec<TerminalResizeHandler>,
 }

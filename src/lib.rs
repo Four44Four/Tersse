@@ -22,8 +22,8 @@ pub use pure::element_placement::{ElementBounds, ElementPlacement, ParentSide};
 pub use runtime::{
     runtime_clamp_fixed_height, runtime_render_height_for_element_text,
     runtime_terminal_color_code, runtime_text_input_state_snapshot, ElementConfig, ElementHandler,
-    ElementHeightMode, FocusStyle, RuntimeUi, Style, TextInputBehavior, TextInputStyle, UiRuntime,
-    UiSession,
+    ElementHeightMode, FocusStyle, RuntimeUi, Style, TerminalResizeHandler, TextInputBehavior,
+    TextInputStyle, UiRuntime, UiSession,
 };
 
 pub mod prelude {
@@ -32,7 +32,8 @@ pub mod prelude {
         static_text_display_unfocusable_fit_width, static_text_fit_height, static_text_fixed,
         text_input_fit_height, text_input_fixed, Color, ElementConfig, ElementHandler,
         ElementHeightMode, ElementId, ElementPlacement, FocusStyle, Location, ParentSide,
-        RuntimeUi, Style, TextInputBehavior, TextInputStyle, UiRuntime, UiSession,
+        RuntimeUi, Style, TerminalResizeHandler, TextInputBehavior, TextInputStyle, UiRuntime,
+        UiSession, terminal_size,
     };
 }
 
@@ -117,6 +118,11 @@ impl Display for DeleteElementError {
 }
 
 impl Error for DeleteElementError {}
+
+/// Current terminal size as `(columns, rows)`.
+pub fn terminal_size() -> std::io::Result<(u16, u16)> {
+    terminal_input::terminal_size()
+}
 
 /// Creates a plain text element with fixed width and no input behavior.
 pub fn create_text_element(width: usize, initial_text: impl Into<String>) -> Element {

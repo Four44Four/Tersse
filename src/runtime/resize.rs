@@ -9,6 +9,22 @@ use crate::terminal_input;
 use super::RuntimeUi;
 
 impl RuntimeUi {
+    /// Registers a callback to run on the UI thread after a debounced terminal resize
+    /// when the terminal dimensions change. Not invoked for the initial size sync at startup.
+    pub fn register_terminal_resize_callback(
+        &mut self,
+        callback: impl FnMut(&mut RuntimeUi) + 'static,
+    ) {
+        self.terminal_resize_callbacks.push(Box::new(callback));
+    }
+
+    fn run_terminal_resize_callbacks(&mut self) {
+        let mut callbacks = std::mem::take(&mut self.terminal_resize_callbacks);
+        for callback in &mut callbacks {
+            callback(self);
+        }
+        self.terminal_resize_callbacks = callbacks;
+    }
     pub(super) fn note_terminal_resize(&mut self) {
         self.resize_debounce_until = Some(resize_debounce::debounce_deadline(
             Instant::now(),
@@ -45,9 +61,13 @@ impl RuntimeUi {
     pub(super) fn reload_screen_after_resize(&mut self) -> bool {
         self.sync_curses_terminal_size();
         let (max_y, max_x) = self.win.get_max_yx();
+        let had_previous_size = self.last_terminal_yx.is_some();
         let changed = self.last_terminal_yx != Some((max_y, max_x));
         self.last_terminal_yx = Some((max_y, max_x));
         if changed {
+            if had_previous_size {
+                self.run_terminal_resize_callbacks();
+            }
             self.refresh_height_cache();
             self.clamp_screen_scroll_offset();
         }

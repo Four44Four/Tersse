@@ -137,6 +137,7 @@ impl RuntimeUi {
             message_gutter_expires_at: None,
             message_gutter_reveal_scroll_cap: None,
             screen_scrolled_toward_document_top_this_batch: false,
+            terminal_resize_callbacks: Vec::new(),
         };
         let _ = ui.reload_screen_after_resize();
         ui

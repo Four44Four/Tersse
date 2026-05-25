@@ -1,5 +1,4 @@
 # Sprint 1
- - Specify text input behavior on input
  - Specify API names and surface
  - prepare for uploading to crate.io
 
