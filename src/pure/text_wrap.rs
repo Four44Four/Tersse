@@ -22,6 +22,9 @@ pub fn wrapped_lines(text: &str, width: usize) -> Vec<String> {
     }
     if !current.is_empty() {
         lines.push(current);
+    } else if text.ends_with('\n') && lines.last().map_or(true, |line| !line.is_empty()) {
+        // Trailing newline opens a new empty row (caret line after the break).
+        lines.push(String::new());
     }
     lines
 }
@@ -42,16 +45,9 @@ pub fn wrapped_lines_for_display(text: &str, width: usize) -> Vec<String> {
     lines
 }
 
-/// Rows to allocate in the UI (at least one row when empty).
+/// Rows to allocate in the UI (matches [`wrapped_lines_for_display`] line count).
 pub fn display_row_count(text: &str, width: usize) -> usize {
-    if text.is_empty() {
-        return 1;
-    }
-    let mut rows = wrapped_line_count(text, width.max(1));
-    if text.ends_with('\n') {
-        rows += 1;
-    }
-    rows.max(1)
+    wrapped_lines_for_display(text, width).len()
 }
 
 /// Map a character-index caret to `(line, col)` in the wrapped display.

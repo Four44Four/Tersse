@@ -41,3 +41,16 @@ pub fn scroll_screen_down(offset: usize, content_height: usize, viewport_height:
 pub fn apply_scroll_to_y(logical_y: i32, scroll_offset: usize) -> i32 {
     logical_y - scroll_offset as i32
 }
+
+/// Screen-scroll offset that keeps `focus_row` (a logical document row) inside the viewport.
+pub fn screen_scroll_to_show_row(
+    focus_row: usize,
+    content_height: usize,
+    viewport_height: usize,
+) -> usize {
+    scroll_view::clamp_scroll_offset(
+        focus_row.saturating_sub(viewport_height.saturating_sub(1)),
+        content_height,
+        viewport_height,
+    )
+}

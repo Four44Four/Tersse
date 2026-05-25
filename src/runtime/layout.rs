@@ -106,12 +106,12 @@ impl RuntimeUi {
         }
         let width = element.width.max(1);
         let text_len = element.text.len();
+        let height = render_height_for_text_input_text(&element.text, width);
         if let Some(cache) = self.text_input_layout_cache.get(&id.as_internal()) {
-            if cache.text_len == text_len && cache.width == width {
+            if cache.text_len == text_len && cache.width == width && cache.height == height {
                 return Some(cache.height);
             }
         }
-        let height = render_height_for_text_input_text(&element.text, width);
         self.text_input_layout_cache.insert(
             id.as_internal(),
             TextInputLayoutCache {

@@ -1,6 +1,6 @@
 use tersse::pure::screen_scroll::{
-    apply_scroll_to_y, clamp_screen_scroll, screen_content_height, screen_viewport_height,
-    scroll_screen_down, scroll_screen_up,
+    apply_scroll_to_y, clamp_screen_scroll, screen_content_height, screen_scroll_to_show_row,
+    screen_viewport_height, scroll_screen_down, scroll_screen_up,
 };
 
 #[test]
@@ -29,4 +29,18 @@ fn screen_scroll_clamps_and_moves_by_line() {
 fn apply_scroll_to_y_allows_negative_draw_rows() {
     assert_eq!(apply_scroll_to_y(5, 3), 2);
     assert_eq!(apply_scroll_to_y(1, 5), -4);
+}
+
+#[test]
+fn screen_scroll_to_show_row_keeps_focus_inside_viewport() {
+    assert_eq!(screen_scroll_to_show_row(0, 30, 24), 0);
+    assert_eq!(screen_scroll_to_show_row(23, 30, 24), 0);
+    assert_eq!(screen_scroll_to_show_row(24, 30, 24), 1);
+    assert_eq!(screen_scroll_to_show_row(29, 30, 24), 6);
+}
+
+#[test]
+fn screen_scroll_to_show_row_keeps_element_bottom_on_screen() {
+    // Input at y=4 with 25 lines ends at row 28; viewport 24 -> scroll 5.
+    assert_eq!(screen_scroll_to_show_row(28, 30, 24), 5);
 }

@@ -35,6 +35,36 @@ fn wrapped_lines_for_display_includes_blank_row_when_empty() {
 fn display_rows_after_explicit_newline() {
     assert_eq!(display_row_count("hello\n", 48), 2);
     assert_eq!(display_row_count("a\nb", 48), 2);
+    assert_eq!(
+        display_row_count("hello\n", 48),
+        wrapped_lines_for_display("hello\n", 48).len()
+    );
+}
+
+#[test]
+fn scrolled_viewport_row_count_does_not_exceed_remaining_content() {
+    use tersse::pure::scroll_view::{clamp_scroll_offset, visible_line_range};
+    let total_lines = 30;
+    let terminal_visible = 24;
+    let offset = clamp_scroll_offset(11, total_lines, terminal_visible);
+    assert_eq!(offset, 6);
+    let range = visible_line_range(offset, terminal_visible, total_lines);
+    assert_eq!(range.len(), total_lines - offset);
+    assert_eq!(range.len(), 24);
+    assert!(range.len() <= terminal_visible);
+}
+
+#[test]
+fn display_row_count_matches_wrapped_lines_for_display() {
+    for text in ["", "hello", "hello\n", "a\nb", "abcde", "hello\n\n"] {
+        for width in [1usize, 3, 20] {
+            assert_eq!(
+                display_row_count(text, width),
+                wrapped_lines_for_display(text, width).len(),
+                "text={text:?} width={width}"
+            );
+        }
+    }
 }
 
 #[test]
