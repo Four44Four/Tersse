@@ -1,8 +1,11 @@
 use tersse::pure::message_gutter::{
-    apply_message, clip_cols_to_avoid_wrapping_into_row, element_row_intersects_gutter_screen_rows,
-    gutter_rows_to_restore, gutter_screen_rows, hide_message, layout_message_gutter_lines,
-    message_gutter_height, row_printing_wraps_into_gutter_block,
-    title_intersects_gutter_screen_rows, MessageGutterState, MsgGutterSide,
+    apply_message, clamp_screen_scroll_with_gutter, clip_cols_to_avoid_wrapping_into_row,
+    element_row_intersects_gutter_screen_rows, gutter_rows_to_restore, gutter_screen_rows,
+    hide_message, layout_message_gutter_lines, max_screen_scroll_offset, message_gutter_height,
+    padding_screen_rows, ratchet_gutter_scroll_cap_on_up, row_printing_wraps_into_gutter_block,
+    screen_scroll_shows_padding, scroll_screen_down_with_gutter,
+    should_hide_gutter_by_scroll_reveal, title_intersects_gutter_screen_rows,
+    viewport_height_for_screen_scroll, MessageGutterState, MsgGutterSide,
 };
 
 #[test]
@@ -138,4 +141,88 @@ fn element_intersection_uses_screen_scroll_offset() {
 fn title_intersection_accounts_for_screen_scroll() {
     assert!(title_intersects_gutter_screen_rows(true, 0, 0..1));
     assert!(!title_intersects_gutter_screen_rows(true, 1, 0..1));
+}
+
+#[test]
+fn viewport_height_shrinks_when_bottom_gutter_visible() {
+    assert_eq!(viewport_height_for_screen_scroll(24, true, 3, MsgGutterSide::Bottom), 21);
+    assert_eq!(viewport_height_for_screen_scroll(24, true, 0, MsgGutterSide::Bottom), 24);
+    assert_eq!(viewport_height_for_screen_scroll(24, true, 3, MsgGutterSide::Top), 24);
+    assert_eq!(viewport_height_for_screen_scroll(24, false, 3, MsgGutterSide::Bottom), 24);
+}
+
+#[test]
+fn scroll_reveal_does_not_hide_at_normal_scroll_end() {
+    assert!(!should_hide_gutter_by_scroll_reveal(6, 30, 24, 3, MsgGutterSide::Bottom));
+    assert!(!should_hide_gutter_by_scroll_reveal(6, 30, 24, 0, MsgGutterSide::Bottom));
+    assert!(!should_hide_gutter_by_scroll_reveal(3, 20, 24, 3, MsgGutterSide::Bottom));
+}
+
+#[test]
+fn max_screen_scroll_uses_effective_viewport_not_double_bonus() {
+    let effective = viewport_height_for_screen_scroll(24, true, 3, MsgGutterSide::Bottom);
+    assert_eq!(max_screen_scroll_offset(30, effective, None), 9);
+    assert_eq!(max_screen_scroll_offset(30, 24, None), 6);
+    assert_eq!(max_screen_scroll_offset(30, 24, Some(13)), 13);
+    assert_eq!(max_screen_scroll_offset(30, 24, Some(3)), 6);
+}
+
+#[test]
+fn scroll_reveal_hides_gutter_at_base_max_plus_height() {
+    assert!(!should_hide_gutter_by_scroll_reveal(8, 30, 24, 3, MsgGutterSide::Bottom));
+    assert!(should_hide_gutter_by_scroll_reveal(9, 30, 24, 3, MsgGutterSide::Bottom));
+}
+
+#[test]
+fn scroll_down_with_gutter_stops_at_effective_viewport_max() {
+    let effective = viewport_height_for_screen_scroll(24, true, 3, MsgGutterSide::Bottom);
+    assert_eq!(scroll_screen_down_with_gutter(8, 30, effective, None), 9);
+    assert_eq!(scroll_screen_down_with_gutter(9, 30, effective, None), 9);
+}
+
+#[test]
+fn reveal_scroll_cap_ratchet_on_scroll_up() {
+    let base_max = 6;
+    assert_eq!(
+        ratchet_gutter_scroll_cap_on_up(Some(13), 11, base_max),
+        Some(11)
+    );
+    assert_eq!(
+        ratchet_gutter_scroll_cap_on_up(Some(13), 13, base_max),
+        Some(13)
+    );
+    assert_eq!(
+        ratchet_gutter_scroll_cap_on_up(Some(13), 3, base_max),
+        Some(6)
+    );
+    assert_eq!(
+        ratchet_gutter_scroll_cap_on_up(Some(13), 6, base_max),
+        Some(6)
+    );
+    assert_eq!(ratchet_gutter_scroll_cap_on_up(None, 5, base_max), None);
+}
+
+#[test]
+fn clamp_screen_scroll_respects_reveal_cap() {
+    assert_eq!(
+        clamp_screen_scroll_with_gutter(20, 30, 24, Some(13)),
+        13
+    );
+    let effective = viewport_height_for_screen_scroll(24, true, 3, MsgGutterSide::Bottom);
+    assert_eq!(clamp_screen_scroll_with_gutter(13, 30, effective, None), 9);
+    assert_eq!(
+        clamp_screen_scroll_with_gutter(13, 30, 24, Some(13)),
+        13
+    );
+    assert_eq!(clamp_screen_scroll_with_gutter(3, 30, 24, Some(3)), 3);
+    assert_eq!(scroll_screen_down_with_gutter(5, 30, 24, Some(3)), 6);
+    assert_eq!(scroll_screen_down_with_gutter(6, 30, 24, Some(3)), 6);
+}
+
+#[test]
+fn padding_rows_not_drawn_while_gutter_visible() {
+    assert!(!screen_scroll_shows_padding(9, 30, 24, true));
+    assert!(screen_scroll_shows_padding(9, 30, 24, false));
+    assert!(!screen_scroll_shows_padding(6, 30, 24, false));
+    assert_eq!(padding_screen_rows(9, 30, 23), 21..23);
 }

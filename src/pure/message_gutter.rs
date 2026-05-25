@@ -1,5 +1,6 @@
 //! Pure layout and state helpers for the temporary message gutter overlay.
 
+use crate::pure::scroll_view;
 use crate::pure::terminal_bounds::content_max_y;
 use crate::pure::text_wrap;
 
@@ -211,4 +212,131 @@ pub fn title_intersects_gutter_screen_rows(
     }
     let title_screen_y = 0i32 - screen_scroll as i32;
     screen_rows.contains(&title_screen_y)
+}
+
+/// Viewport row count available for scrolling content while the gutter is visible.
+///
+/// The message gutter is fixed to the bottom of the terminal (screen space). Those rows are not
+/// usable for content, so the scrollable viewport is shorter by the gutter height.
+pub fn viewport_height_for_screen_scroll(
+    full_viewport_height: usize,
+    gutter_visible: bool,
+    gutter_height: usize,
+    side: MsgGutterSide,
+) -> usize {
+    if gutter_visible && gutter_height > 0 && matches!(side, MsgGutterSide::Bottom) {
+        full_viewport_height.saturating_sub(gutter_height).max(1)
+    } else {
+        full_viewport_height
+    }
+}
+
+/// Largest valid screen scroll offset given base content and gutter/reveal state.
+///
+/// After a scroll-reveal hide, `reveal_scroll_cap` limits re-entry into the bonus scroll range
+/// but never below the normal content maximum for the full terminal viewport.
+pub fn max_screen_scroll_offset(
+    base_content_height: usize,
+    viewport_height: usize,
+    reveal_scroll_cap: Option<usize>,
+) -> usize {
+    let base_max = scroll_view::max_scroll_offset(base_content_height, viewport_height);
+    match reveal_scroll_cap {
+        Some(cap) => cap.max(base_max),
+        None => base_max,
+    }
+}
+
+/// Clamp a screen scroll offset using [`max_screen_scroll_offset`].
+pub fn clamp_screen_scroll_with_gutter(
+    offset: usize,
+    base_content_height: usize,
+    viewport_height: usize,
+    reveal_scroll_cap: Option<usize>,
+) -> usize {
+    let max = max_screen_scroll_offset(base_content_height, viewport_height, reveal_scroll_cap);
+    offset.min(max)
+}
+
+/// Scroll the screen down by one row toward [`max_screen_scroll_offset`].
+pub fn scroll_screen_down_with_gutter(
+    offset: usize,
+    base_content_height: usize,
+    viewport_height: usize,
+    reveal_scroll_cap: Option<usize>,
+) -> usize {
+    let max = max_screen_scroll_offset(base_content_height, viewport_height, reveal_scroll_cap);
+    (offset + 1).min(max)
+}
+
+/// True when the user has scrolled far enough to reveal content that was under the gutter.
+///
+/// Uses a viewport shortened by the gutter height; does not add a second bonus on top.
+pub fn should_hide_gutter_by_scroll_reveal(
+    screen_scroll: usize,
+    base_content_height: usize,
+    full_viewport_height: usize,
+    gutter_height: usize,
+    side: MsgGutterSide,
+) -> bool {
+    if gutter_height == 0 || !matches!(side, MsgGutterSide::Bottom) {
+        return false;
+    }
+    let effective_viewport =
+        viewport_height_for_screen_scroll(full_viewport_height, true, gutter_height, side);
+    let reveal_at = scroll_view::max_scroll_offset(base_content_height, effective_viewport);
+    if reveal_at == 0 {
+        return false;
+    }
+    screen_scroll >= reveal_at
+}
+
+/// Ratchet the post-reveal bonus scroll ceiling down when the user scrolls up.
+///
+/// Scrolling up within normal content (`screen_scroll <= base_max`) clamps the cap to
+/// `base_max` so screen scroll is never permanently limited below the content bottom.
+pub fn ratchet_gutter_scroll_cap_on_up(
+    reveal_scroll_cap: Option<usize>,
+    screen_scroll: usize,
+    base_max_scroll: usize,
+) -> Option<usize> {
+    reveal_scroll_cap.map(|cap| {
+        if screen_scroll <= base_max_scroll {
+            cap.min(base_max_scroll)
+        } else {
+            cap.min(screen_scroll)
+        }
+    })
+}
+
+/// Whether the viewport shows logical rows past the end of real content.
+///
+/// While the gutter is visible, padding is never drawn (gutter rows stay fixed screen space).
+pub fn screen_scroll_shows_padding(
+    screen_scroll: usize,
+    base_content_height: usize,
+    full_viewport_height: usize,
+    gutter_visible: bool,
+) -> bool {
+    if gutter_visible || full_viewport_height == 0 {
+        return false;
+    }
+    let base_max = scroll_view::max_scroll_offset(base_content_height, full_viewport_height);
+    screen_scroll > base_max
+}
+
+/// Screen rows that should be filled with default background below content end.
+pub fn padding_screen_rows(
+    screen_scroll: usize,
+    base_content_height: usize,
+    terminal_max_y: i32,
+) -> std::ops::Range<i32> {
+    let max_row = content_max_y(terminal_max_y);
+    let first_screen = base_content_height as i32 - screen_scroll as i32;
+    let start = first_screen.clamp(0, max_row + 1);
+    if start > max_row {
+        0..0
+    } else {
+        start..max_row + 1
+    }
 }

@@ -81,6 +81,10 @@ impl RuntimeUi {
         }
 
         self.draw_cursor_for_active_text_input();
+        self.fill_scroll_padding_rows();
+        if self.message_gutter.visible {
+            self.draw_message_gutter_overlay();
+        }
         self.win.refresh();
         // A full-screen draw supersedes any incremental queue redraw plan (e.g. marks
         // accumulated while creating elements before the first frame).

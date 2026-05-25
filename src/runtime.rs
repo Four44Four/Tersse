@@ -110,4 +110,6 @@ pub struct RuntimeUi {
     text_input_redraw_committed: bool,
     message_gutter: MessageGutterState,
     message_gutter_expires_at: Option<Instant>,
+    /// Max screen scroll after the gutter was dismissed by scrolling to reveal content.
+    message_gutter_reveal_scroll_cap: Option<usize>,
 }

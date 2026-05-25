@@ -135,6 +135,7 @@ impl RuntimeUi {
             text_input_redraw_committed: false,
             message_gutter: MessageGutterState::default(),
             message_gutter_expires_at: None,
+            message_gutter_reveal_scroll_cap: None,
         };
         let _ = ui.reload_screen_after_resize();
         ui

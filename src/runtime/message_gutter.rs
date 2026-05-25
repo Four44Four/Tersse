@@ -22,11 +22,15 @@ impl RuntimeUi {
     }
 
     pub(super) fn message_gutter_screen_row_range(&self) -> Range<i32> {
-        if !self.message_gutter.visible || self.message_gutter.rendered_height == 0 {
+        if !self.message_gutter.visible {
+            return 0..0;
+        }
+        let height = self.message_gutter_layout_height();
+        if height == 0 {
             return 0..0;
         }
         let (max_y, _) = self.win.get_max_yx();
-        gutter_screen_rows(MSG_GUTTER_SIDE, self.message_gutter.rendered_height, max_y)
+        gutter_screen_rows(MSG_GUTTER_SIDE, height, max_y)
     }
 
     pub(super) fn is_message_gutter_screen_row(&self, screen_y: i32) -> bool {
@@ -75,10 +79,12 @@ impl RuntimeUi {
             .message_gutter_expires_at
             .is_some_and(|until| now < until && self.message_gutter.visible);
         let previous_height = self.message_gutter.rendered_height;
+        self.message_gutter_reveal_scroll_cap = None;
         self.message_gutter =
             message_gutter::apply_message(&self.message_gutter, message, already_visible);
         self.message_gutter_expires_at = Some(now + Duration::from_millis(MSG_GUTTER_DURA_MS));
         self.refresh_message_gutter_after_change(previous_height);
+        self.clamp_screen_scroll_offset();
     }
 
     pub(super) fn tick_message_gutter_expiry(&mut self) -> bool {
@@ -131,13 +137,68 @@ impl RuntimeUi {
         let previous_height = self.message_gutter.rendered_height;
         self.message_gutter = message_gutter::hide_message(&self.message_gutter);
         self.message_gutter_expires_at = None;
+        self.message_gutter_reveal_scroll_cap = None;
         if previous_height > 0 {
             let (max_y, _) = self.win.get_max_yx();
             let rows = gutter_screen_rows(MSG_GUTTER_SIDE, previous_height, max_y);
             self.restore_screen_rows(rows);
         }
         self.message_gutter.rendered_height = 0;
+        let (base_content_height, full_viewport) = self.full_screen_scroll_bounds();
+        let base_max =
+            crate::pure::scroll_view::max_scroll_offset(base_content_height, full_viewport);
+        if self.screen_scroll > base_max {
+            // Preserve scroll position after hiding so post-hide padding remains visible.
+            // Future scroll-up ratchets this cap down.
+            self.message_gutter_reveal_scroll_cap = Some(self.screen_scroll);
+        } else {
+            self.message_gutter_reveal_scroll_cap = None;
+        }
         self.win.refresh();
+    }
+
+    pub(super) fn message_gutter_layout_height(&self) -> usize {
+        if !self.message_gutter.visible {
+            return 0;
+        }
+        let (_, max_x) = self.win.get_max_yx();
+        let terminal_width = (max_x + 1).max(1) as usize;
+        let layout_height = message_gutter::message_gutter_height(
+            &self.message_gutter.message,
+            self.message_gutter.show_multi_indicator,
+            MSG_GUTTER_MULTI_MSG_STR,
+            terminal_width,
+            MSG_GUTTER_MAX_HEIGHT,
+        );
+        layout_height.max(self.message_gutter.rendered_height)
+    }
+
+    pub(super) fn fill_scroll_padding_rows(&mut self) {
+        let (base_content_height, full_viewport) = self.full_screen_scroll_bounds();
+        if !message_gutter::screen_scroll_shows_padding(
+            self.screen_scroll,
+            base_content_height,
+            full_viewport,
+            self.message_gutter.visible,
+        ) {
+            return;
+        }
+        let (max_y, max_x) = self.win.get_max_yx();
+        let rows = message_gutter::padding_screen_rows(
+            self.screen_scroll,
+            base_content_height,
+            max_y,
+        );
+        if rows.is_empty() {
+            return;
+        }
+        let pair = self.color_pair(Color::Default, Color::Default);
+        for screen_y in rows {
+            if self.is_message_gutter_screen_row(screen_y) {
+                continue;
+            }
+            self.fill_solid_overlay(screen_y, 0, max_x + 1, 1, pair);
+        }
     }
 
     fn refresh_message_gutter_after_change(&mut self, previous_height: usize) {
