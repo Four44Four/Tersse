@@ -289,21 +289,21 @@ impl RuntimeUi {
 
         self.win.mv(screen_y, 0);
         if !line.message_text.is_empty() {
-            self.win.attron(COLOR_PAIR(message_pair as u64));
+            self.win.attron(COLOR_PAIR(message_pair as pancurses::chtype));
             let clipped = terminal_bounds::clip_str_to_cols(&line.message_text, row_cols);
             self.win.addstr(&clipped);
-            self.win.attroff(COLOR_PAIR(message_pair as u64));
+            self.win.attroff(COLOR_PAIR(message_pair as pancurses::chtype));
         }
 
         if let Some(indicator) = &line.indicator_text {
             let indicator_x = message_cols as i32;
             if indicator_x < row_cols as i32 {
-                self.win.attron(COLOR_PAIR(indicator_pair as u64));
+                self.win.attron(COLOR_PAIR(indicator_pair as pancurses::chtype));
                 self.win.mv(screen_y, indicator_x);
                 let remaining = row_cols.saturating_sub(message_cols);
                 let clipped = terminal_bounds::clip_str_to_cols(indicator, remaining);
                 self.win.addstr(&clipped);
-                self.win.attroff(COLOR_PAIR(indicator_pair as u64));
+                self.win.attroff(COLOR_PAIR(indicator_pair as pancurses::chtype));
             }
         }
     }

@@ -9,3 +9,7 @@
        - Modify existing test targetting that functionality or create a new unit test in ./tests
  - Refer to files in directory ./specifications for technical specifications on components and features 
  - Do not add any features that allow for scheduling based on UI event loop
+ - Whenever new tests are implemented or tests are modified:
+    - Run the Dockerfile to test all tests for memory leaks
+    - If any are identified:
+       - Fix them without compromising functionality or specifications

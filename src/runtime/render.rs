@@ -421,7 +421,7 @@ impl RuntimeUi {
         });
 
         if highlight_cells.is_none() {
-            self.win.attron(COLOR_PAIR(base_pair as u64));
+            self.win.attron(COLOR_PAIR(base_pair as pancurses::chtype));
         }
         for line_idx in visible_lines {
             let row_y = y + line_to_screen_row(line_idx);
@@ -454,19 +454,19 @@ impl RuntimeUi {
                     } else {
                         base_pair
                     };
-                    self.win.attron(COLOR_PAIR(pair as u64));
+                    self.win.attron(COLOR_PAIR(pair as pancurses::chtype));
                     self.win.mv(row_y, x + col as i32);
                     self.win.addch(ch);
-                    self.win.attroff(COLOR_PAIR(pair as u64));
+                    self.win.attroff(COLOR_PAIR(pair as pancurses::chtype));
                 }
                 for col in line.chars().count()..max_cols {
                     if !cells.contains(&(line_idx, col)) {
                         continue;
                     }
-                    self.win.attron(COLOR_PAIR(selection_pair as u64));
+                    self.win.attron(COLOR_PAIR(selection_pair as pancurses::chtype));
                     self.win.mv(row_y, x + col as i32);
                     self.win.addch(' ');
-                    self.win.attroff(COLOR_PAIR(selection_pair as u64));
+                    self.win.attroff(COLOR_PAIR(selection_pair as pancurses::chtype));
                 }
             } else {
                 self.win.mv(row_y, x);
@@ -475,7 +475,7 @@ impl RuntimeUi {
             }
         }
         if highlight_cells.is_none() {
-            self.win.attroff(COLOR_PAIR(base_pair as u64));
+            self.win.attroff(COLOR_PAIR(base_pair as pancurses::chtype));
         }
     }
 
@@ -514,7 +514,7 @@ impl RuntimeUi {
             return;
         }
         let visible_rows = terminal_bounds::visible_element_line_range(y, logical_rows, max_y);
-        self.win.attron(COLOR_PAIR(pair as u64));
+        self.win.attron(COLOR_PAIR(pair as pancurses::chtype));
         for row in visible_rows {
             let row_y = y + row;
             if skip_message_gutter && self.is_message_gutter_screen_row(row_y) {
@@ -534,7 +534,7 @@ impl RuntimeUi {
                 self.win.addch(' ');
             }
         }
-        self.win.attroff(COLOR_PAIR(pair as u64));
+        self.win.attroff(COLOR_PAIR(pair as pancurses::chtype));
     }
 
     fn draw_cursor_for_active_text_input(&mut self) {
