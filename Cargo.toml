@@ -4,6 +4,10 @@ version = "0.1.0"
 edition = "2021"
 description = "Cross-platform curses TUI"
 license = "MIT OR Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/Four44Four/Tersse"
+keywords = ["UI", "curses", "terminal", "async", "simple"]
+categories = ["command-line-interface", "command-line-utilities", "text-editors"]
 build = "build.rs"
 
 [features]

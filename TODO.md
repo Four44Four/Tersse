@@ -1,5 +1,4 @@
 # Sprint 1
- - Specify API names and surface
  - prepare for uploading to crate.io
 
 # Sprint 2

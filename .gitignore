@@ -1,3 +1,4 @@
 .env*
 AGENT_DUMP.md
 /target/
+.cargo_token
