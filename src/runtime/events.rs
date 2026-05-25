@@ -21,7 +21,7 @@ impl RuntimeUi {
         }
         let width = element.width.max(1);
         let before = super::layout::render_height_for_text_input_text(before_text, width);
-        let after = self.dynamic_element_render_height(id).unwrap_or(before);
+        let after = super::layout::render_height_for_text_input_text(&element.text, width);
         after != before
     }
 

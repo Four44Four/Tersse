@@ -1,7 +1,7 @@
 use tersse::pure::terminal_bounds::{
     clip_height_at_terminal, clip_rect, clip_str_to_cols, cols_for_printing, cols_visible_from,
-    content_max_y, max_element_row_cols, row_is_visible, rows_visible_from,
-    visible_element_line_range,
+    content_max_y, drawable_rows_in_span, max_element_row_cols, row_is_visible,
+    rows_visible_from, text_input_draw_line_indices, visible_element_line_range,
 };
 
 #[test]
@@ -80,4 +80,28 @@ fn visible_counts_are_zero_when_anchor_is_off_screen() {
 #[test]
 fn clip_str_empty_when_no_columns_available() {
     assert_eq!(clip_str_to_cols("abcdef", 0), "");
+}
+
+#[test]
+fn drawable_rows_in_span_skips_blocked_rows() {
+    let blocked = |y: i32| (0..3).contains(&y);
+    assert_eq!(drawable_rows_in_span(0, 10, 23, blocked), 7);
+    assert_eq!(drawable_rows_in_span(4, 10, 23, |_| false), 10);
+}
+
+#[test]
+fn text_input_draw_line_indices_intersects_scroll_with_on_screen_lines() {
+    // Anchor screen y=-10 with viewport=19 means only viewport rows 10..=18 are visible.
+    let on_screen = visible_element_line_range(-10, 50, 23);
+    assert_eq!(on_screen, 10..33);
+    let draw = text_input_draw_line_indices(-10, 50, 10, 19, 23);
+    assert_eq!(draw, 20..29);
+    let draw = text_input_draw_line_indices(-10, 50, 25, 19, 23);
+    assert_eq!(draw, 35..44);
+}
+
+#[test]
+fn text_input_draw_line_indices_keep_full_viewport_when_scrolled() {
+    let draw = text_input_draw_line_indices(0, 100, 10, 19, 23);
+    assert_eq!(draw, 10..29);
 }

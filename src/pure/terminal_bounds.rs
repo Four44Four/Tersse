@@ -1,5 +1,7 @@
 //! Clip rectangles and text to a terminal window (0-indexed max row/column).
 
+use crate::pure::scroll_view;
+
 /// Max row index usable for TUI elements (`get_max_y()` minus one reserved row).
 pub fn content_max_y(terminal_max_y: i32) -> i32 {
     (terminal_max_y - 1).max(0)
@@ -80,6 +82,60 @@ pub fn max_element_row_cols(
 /// Truncate `height` so the rectangle ending at `y + height - 1` does not extend past usable height.
 pub fn clip_height_at_terminal(y: i32, height: i32, terminal_max_y: i32) -> i32 {
     rows_visible_from(y, terminal_max_y).min(height).max(0)
+}
+
+/// Counts terminal rows in `[start_y, start_y + logical_rows)` that are visible and not blocked.
+pub fn drawable_rows_in_span(
+    start_y: i32,
+    logical_rows: i32,
+    terminal_max_y: i32,
+    mut is_blocked_row: impl FnMut(i32) -> bool,
+) -> usize {
+    if logical_rows <= 0 {
+        return 0;
+    }
+    let end_y = start_y.saturating_add(logical_rows);
+    let mut count = 0usize;
+    for screen_y in start_y..end_y {
+        if row_is_visible(screen_y, terminal_max_y) && !is_blocked_row(screen_y) {
+            count += 1;
+        }
+    }
+    count
+}
+
+/// Wrapped line indices to draw for a text field at `anchor_screen_y`.
+///
+/// Intersects in-field scroll range with the lines that actually intersect the terminal.
+pub fn text_input_draw_line_indices(
+    anchor_screen_y: i32,
+    total_lines: usize,
+    scroll_offset: usize,
+    scroll_viewport: usize,
+    terminal_max_y: i32,
+) -> std::ops::Range<usize> {
+    if total_lines == 0 || scroll_viewport == 0 {
+        return 0..0;
+    }
+    let viewport_rows =
+        visible_element_line_range(anchor_screen_y, scroll_viewport as i32, terminal_max_y);
+    if viewport_rows.is_empty() {
+        return 0..0;
+    }
+    let scroll_range = scroll_view::visible_line_range(scroll_offset, scroll_viewport, total_lines);
+    let start = scroll_range
+        .start
+        .saturating_add(viewport_rows.start as usize);
+    let end = scroll_range
+        .start
+        .saturating_add(viewport_rows.end as usize)
+        .min(scroll_range.end)
+        .min(total_lines);
+    if start >= end {
+        0..0
+    } else {
+        start..end
+    }
 }
 
 /// Clip a `(width, height)` rectangle anchored at `(x, y)` to fit the terminal.

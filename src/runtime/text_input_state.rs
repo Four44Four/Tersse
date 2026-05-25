@@ -9,10 +9,14 @@ use super::RuntimeUi;
 
 impl RuntimeUi {
     /// Terminal rows currently visible for a fit-height text field (0 when fully off-screen).
+    ///
+    /// Excludes message-gutter rows so in-field scroll matches drawable rows.
     pub(super) fn text_input_terminal_visible_rows(&self, anchor_y: u16, logical_rows: usize) -> usize {
         let (max_y, _) = self.win.get_max_yx();
         let y = self.scrolled_y(anchor_y as i32);
-        terminal_bounds::clip_height_at_terminal(y, logical_rows as i32, max_y).max(0) as usize
+        terminal_bounds::drawable_rows_in_span(y, logical_rows as i32, max_y, |screen_y| {
+            self.is_message_gutter_screen_row(screen_y)
+        })
     }
     pub(super) fn text_input_state(&self, id: ElementId) -> TextInputState {
         self.element_by_id(id)
@@ -61,6 +65,13 @@ impl RuntimeUi {
             self.text_input_terminal_visible_rows(anchor_y, total_lines)
                 .max(1)
         });
+        if fixed_viewport.is_none() {
+            if let Some(element) = self.element_mut_by_id(id) {
+                // Fit-height text inputs track visibility via document scroll, not in-field scroll.
+                element.scroll = 0;
+            }
+            return;
+        }
         let desired = line.saturating_sub(viewport_rows.saturating_sub(1));
         let scroll =
             scroll_view::clamp_scroll_offset(desired, total_lines, viewport_rows.max(1));
@@ -89,13 +100,26 @@ impl RuntimeUi {
         );
     }
 
-    pub(super) fn sync_text_input_viewport_after_edit(&mut self, id: ElementId) -> bool {
+    pub(super) fn sync_text_input_viewport_after_edit(
+        &mut self,
+        id: ElementId,
+    ) -> (bool, bool) {
+        let is_fit_height = self
+            .element_by_id(id)
+            .is_some_and(|element| element.fixed_viewport_height().is_none());
+        let cached_height_before = is_fit_height
+            .then(|| self.cached_heights.get(&id.as_internal()).copied())
+            .flatten();
         self.auto_reflow_for_dynamic_heights();
+        let cached_height_after = is_fit_height
+            .then(|| self.cached_heights.get(&id.as_internal()).copied())
+            .flatten();
+        let layout_height_changed =
+            matches!((cached_height_before, cached_height_after), (Some(b), Some(a)) if b != a);
         // Screen scroll first so in-field scroll uses the correct on-screen row count.
         self.sync_screen_scroll_for_text_input_growth(id);
         self.sync_text_input_scroll_for_cursor(id);
-        self.element_by_id(id)
-            .is_some_and(|element| element.fixed_viewport_height().is_none())
+        (is_fit_height, layout_height_changed)
     }
 
     pub(super) fn set_text_input_state(&mut self, id: ElementId, state: TextInputState) {

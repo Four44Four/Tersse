@@ -149,7 +149,16 @@ impl RuntimeUi {
             .iter()
             .map(|element| {
                 let y = element.location.y;
-                let height = self.cached_heights.get(&element.id()).copied().unwrap_or(1);
+                let height = if element.text_input.is_some()
+                    && element.fixed_viewport_height().is_none()
+                {
+                    super::layout::render_height_for_text_input_text(
+                        &element.text,
+                        element.width.max(1),
+                    )
+                } else {
+                    self.cached_heights.get(&element.id()).copied().unwrap_or(1)
+                };
                 (y, height)
             })
             .collect::<Vec<_>>();
