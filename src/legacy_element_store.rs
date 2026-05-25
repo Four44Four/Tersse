@@ -1,21 +1,31 @@
-//! Element storage with O(1) id access and O(log n) focus traversal.
+//! Legacy element store used only by integration tests (`test-api` feature).
 
+use crate::element_id::ElementId;
 use crate::pure::element_id::allocate_element_id;
 use crate::pure::focus_store::IndexedFocusStore;
-use crate::Element;
 
-/// Opaque handle for an element assigned by the store.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct ElementId(usize);
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TextInputProperty {
+    pub locked: bool,
+}
 
-impl ElementId {
-    pub(crate) fn from_internal(id: usize) -> Self {
-        Self(id)
-    }
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Element {
+    pub width: usize,
+    pub text: String,
+    pub focused: bool,
+    pub text_input: Option<TextInputProperty>,
+}
 
-    pub(crate) fn as_internal(self) -> usize {
-        self.0
-    }
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum FocusError {
+    IdNotFound { id: ElementId },
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum DeleteElementError {
+    IdNotFound { id: ElementId },
+    NoFocusedElement,
 }
 
 /// A TUI element with stable id and focus-order key.
@@ -26,7 +36,7 @@ pub struct StoredElement {
 }
 
 impl StoredElement {
-    pub(crate) fn new(id: usize, focus_number: f64, element: Element) -> Self {
+    fn new(id: usize, focus_number: f64, element: Element) -> Self {
         Self {
             id,
             focus_number,

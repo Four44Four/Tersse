@@ -24,7 +24,7 @@ COPY . .
 
 RUN sed -i 's/\r$//' docker/entrypoint.sh docker/run-valgrind-tests.sh docker/run-valgrind-examples.sh \
     && chmod +x docker/entrypoint.sh docker/run-valgrind-tests.sh docker/run-valgrind-examples.sh \
-    && cargo test --tests --no-run \
+    && cargo test --tests --no-run --features test-api \
     && cargo build --bins
 
 ENTRYPOINT ["/app/docker/entrypoint.sh"]

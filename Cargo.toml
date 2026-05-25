@@ -7,8 +7,10 @@ license = "MIT OR Apache-2.0"
 build = "build.rs"
 
 [features]
-default = ["pure-tests"]
+default = []
 pure-tests = []
+# Internal pure modules plus runtime/layout helpers used only by integration tests.
+test-api = ["pure-tests"]
 debug_should_draw_do_delay = []
 
 [dependencies]

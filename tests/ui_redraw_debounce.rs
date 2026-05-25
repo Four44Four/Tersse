@@ -1,7 +1,7 @@
 use std::time::{Duration, Instant};
 
 use tersse::pure::resize_debounce::{debounce_deadline, debounce_has_elapsed};
-use tersse::UI_REDRAW_DEBOUNCE_QUEUE_UPDATE_MS;
+use tersse::test_api::UI_REDRAW_DEBOUNCE_QUEUE_UPDATE_MS;
 
 #[test]
 fn ui_redraw_debounce_queue_update_is_positive() {

@@ -1,4 +1,4 @@
-use tersse::{
+use tersse::test_api::{
     create_text_element, delete_focused_tui_element, delete_tui_element, force_focus_on_element,
     Element, ElementStore, FocusError,
 };

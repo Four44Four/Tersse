@@ -1,4 +1,4 @@
-use tersse::{runtime_clamp_fixed_height, runtime_text_input_state_snapshot};
+use tersse::test_api::{runtime_clamp_fixed_height, runtime_text_input_state_snapshot};
 
 #[test]
 fn fixed_height_is_clamped_to_minimum_one() {

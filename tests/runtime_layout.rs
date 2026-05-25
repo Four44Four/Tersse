@@ -1,4 +1,4 @@
-use tersse::{runtime_clamp_fixed_height, runtime_render_height_for_element_text};
+use tersse::test_api::{runtime_clamp_fixed_height, runtime_render_height_for_element_text};
 
 #[test]
 fn render_height_for_text_input_grows_with_wrapped_lines() {

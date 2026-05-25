@@ -2,7 +2,8 @@ use tersse::pure::element_placement::{
     default_child_location, descendant_ids, rectangles_overlap, resolve_absolute_location,
     resolve_overlap_location, ElementBounds, ElementPlacement, ParentSide,
 };
-use tersse::{create_text_element, Element, ElementStore, Location};
+use tersse::test_api::{create_text_element, Element, ElementStore};
+use tersse::Location;
 
 fn bounds(x: u16, y: u16, width: usize, height: usize) -> ElementBounds {
     ElementBounds {

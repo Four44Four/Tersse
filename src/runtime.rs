@@ -61,18 +61,22 @@ struct TextInputLayoutCache {
     height: usize,
 }
 
+#[cfg(feature = "test-api")]
 pub fn runtime_terminal_color_code(color: crate::Color) -> i16 {
     colors::terminal_color_code(color)
 }
 
+#[cfg(feature = "test-api")]
 pub fn runtime_render_height_for_element_text(text: &str, width: usize) -> usize {
     layout::render_height_for_text_input_text(text, width)
 }
 
+#[cfg(feature = "test-api")]
 pub fn runtime_clamp_fixed_height(height: usize) -> usize {
     types::clamp_fixed_height(height)
 }
 
+#[cfg(feature = "test-api")]
 pub fn runtime_text_input_state_snapshot(
     text: impl Into<String>,
     cursor: usize,
