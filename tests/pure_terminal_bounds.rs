@@ -1,7 +1,8 @@
 use tersse::pure::terminal_bounds::{
     clip_height_at_terminal, clip_rect, clip_str_to_cols, cols_for_printing, cols_visible_from,
-    content_max_y, drawable_rows_in_span, max_element_row_cols, row_is_visible,
-    rows_visible_from, text_input_draw_line_indices, visible_element_line_range,
+    content_max_y, drawable_rows_in_span, element_intersects_terminal_viewport,
+    max_element_row_cols, row_is_visible, rows_visible_from, text_input_draw_line_indices,
+    visible_element_line_range,
 };
 
 #[test]
@@ -29,6 +30,15 @@ fn visible_element_line_range_matches_viewport() {
     assert_eq!(visible_element_line_range(4, 100, 23), 0..19);
     assert_eq!(visible_element_line_range(-3, 100, 23), 3..26);
     assert_eq!(visible_element_line_range(30, 5, 23), 0..0);
+}
+
+#[test]
+fn element_intersects_terminal_viewport_matches_line_range() {
+    assert!(element_intersects_terminal_viewport(4, 1, 23));
+    assert!(element_intersects_terminal_viewport(-3, 10, 23));
+    assert!(!element_intersects_terminal_viewport(-3, 1, 23));
+    assert!(!element_intersects_terminal_viewport(30, 5, 23));
+    assert!(!element_intersects_terminal_viewport(0, 0, 23));
 }
 
 #[test]

@@ -311,7 +311,7 @@ impl RuntimeUi {
 
     fn handle_key(&mut self, key: TerminalKey) -> (UiEvent, bool) {
         if self.handle_screen_scroll(key) {
-            return (UiEvent::None, true);
+            return (UiEvent::None, false);
         }
 
         if self.handle_display_scroll(key) {

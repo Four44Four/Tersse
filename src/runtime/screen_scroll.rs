@@ -103,6 +103,9 @@ impl RuntimeUi {
             }
             _ => false,
         };
+        if handled {
+            self.redraw_after_screen_scroll();
+        }
         handled
     }
 

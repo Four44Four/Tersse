@@ -1,5 +1,5 @@
 # Sprint 1
- - Message gutter
+ - Screens
  - Message screen
  - Help screen
  - Make a new example that is even more basic than basic

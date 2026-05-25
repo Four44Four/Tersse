@@ -61,18 +61,38 @@ impl RuntimeUi {
     }
 
     pub fn draw(&mut self) {
-        self.auto_reflow_for_dynamic_heights();
-        self.clamp_screen_scroll_offset();
-        self.sync_focus_flags();
+        self.erase_content_for_draw();
+        self.paint_visible_elements();
+        // A full-screen draw supersedes any incremental queue redraw plan (e.g. marks
+        // accumulated while creating elements before the first frame).
+        self.clear_pending_queue_redraw();
+    }
+
+    /// Repaints on-screen elements after screen scroll without redrawing off-screen elements.
+    pub(super) fn redraw_after_screen_scroll(&mut self) {
+        self.erase_content_for_draw();
+        self.paint_visible_elements();
+        self.clear_pending_queue_redraw();
+    }
+
+    fn erase_content_for_draw(&mut self) {
         if self.message_gutter.visible {
             self.clear_screen_for_draw();
         } else {
             self.win.erase();
         }
+    }
+
+    fn paint_visible_elements(&mut self) {
+        self.auto_reflow_for_dynamic_heights();
+        self.clamp_screen_scroll_offset();
+        self.sync_focus_flags();
 
         let draw_order: Vec<usize> = self.elements.focus_order_ids();
         for id in draw_order {
-            self.draw_existing_element(id);
+            if self.element_intersects_terminal_viewport(id) {
+                self.draw_existing_element(id);
+            }
         }
 
         self.draw_cursor_for_active_text_input();
@@ -80,9 +100,6 @@ impl RuntimeUi {
         // Message gutter overlay is drawn only on apply/update (refresh) or hide; see
         // specifications/message_gutter.txt. clear_screen_for_draw already skips gutter rows.
         self.win.refresh();
-        // A full-screen draw supersedes any incremental queue redraw plan (e.g. marks
-        // accumulated while creating elements before the first frame).
-        self.clear_pending_queue_redraw();
     }
 
     pub(super) fn mark_element_only_changed(&mut self, id: ElementId) {
@@ -153,7 +170,9 @@ impl RuntimeUi {
             current.map(ElementId::as_internal),
         );
         for id in ids {
-            self.draw_existing_element(id);
+            if self.element_intersects_terminal_viewport(id) {
+                self.draw_existing_element(id);
+            }
         }
 
         self.draw_cursor_for_active_text_input();
@@ -167,7 +186,9 @@ impl RuntimeUi {
         self.sync_focus_flags();
 
         if let Some(id) = current.map(ElementId::as_internal) {
-            self.draw_existing_element(id);
+            if self.element_intersects_terminal_viewport(id) {
+                self.draw_existing_element(id);
+            }
         }
 
         self.draw_cursor_for_active_text_input();
@@ -183,7 +204,7 @@ impl RuntimeUi {
         let height_changed =
             layout_height_changed || self.text_input_height_changed(id, before_text);
         if screen_scroll_changed {
-            self.draw();
+            self.redraw_after_screen_scroll();
         } else if height_changed {
             if let Some(anchor_y) = self.element_location(id).map(|location| location.y) {
                 let logical_rows = self
@@ -214,7 +235,7 @@ impl RuntimeUi {
             let Some(location) = self.element_location(ElementId::from_internal(element_id)) else {
                 continue;
             };
-            if location.y >= anchor {
+            if location.y >= anchor && self.element_intersects_terminal_viewport(element_id) {
                 self.draw_existing_element(element_id);
             }
         }
@@ -222,6 +243,20 @@ impl RuntimeUi {
         self.draw_cursor_for_active_text_input();
         self.fill_scroll_padding_rows();
         self.win.refresh();
+    }
+
+    pub(in crate::runtime) fn element_intersects_terminal_viewport(&self, id: usize) -> bool {
+        let Some(element) = self.elements.get(id) else {
+            return false;
+        };
+        let logical_rows = self
+            .cached_heights
+            .get(&id)
+            .copied()
+            .unwrap_or_else(|| self.element_render_height(element)) as i32;
+        let (_, max_y) = self.win.get_max_yx();
+        let anchor_y = self.scrolled_y(element.location.y as i32);
+        terminal_bounds::element_intersects_terminal_viewport(anchor_y, logical_rows, max_y)
     }
 
     pub(in crate::runtime) fn draw_existing_element(&mut self, id: usize) {
@@ -309,6 +344,9 @@ impl RuntimeUi {
         let (max_y, max_x) = self.win.get_max_yx();
         let x = location.x as i32;
         let y = self.scrolled_y(location.y as i32);
+        if !terminal_bounds::element_intersects_terminal_viewport(y, logical_rows as i32, max_y) {
+            return;
+        }
         let (draw_w, draw_h) =
             terminal_bounds::clip_rect(x, y, width as i32, logical_rows as i32, max_x, max_y);
         if draw_w <= 0 || draw_h <= 0 {
@@ -584,7 +622,9 @@ impl RuntimeUi {
             let Some(location) = self.element_location(ElementId::from_internal(id)) else {
                 continue;
             };
-            if plan.should_draw(id, location.y) {
+            if plan.should_draw(id, location.y)
+                && self.element_intersects_terminal_viewport(id)
+            {
                 self.draw_existing_element(id);
             }
         }

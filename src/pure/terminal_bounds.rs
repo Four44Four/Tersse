@@ -35,6 +35,15 @@ pub fn rows_visible_from(y: i32, terminal_max_y: i32) -> i32 {
 ///
 /// The rightmost terminal column is reserved on all usable rows.
 
+/// Whether any row of an element anchored at `anchor_screen_y` intersects the terminal viewport.
+pub fn element_intersects_terminal_viewport(
+    anchor_screen_y: i32,
+    logical_rows: i32,
+    terminal_max_y: i32,
+) -> bool {
+    !visible_element_line_range(anchor_screen_y, logical_rows, terminal_max_y).is_empty()
+}
+
 /// Line indices `[start, end)` within an element that intersect visible terminal rows.
 pub fn visible_element_line_range(
     anchor_y: i32,
