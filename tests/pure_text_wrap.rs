@@ -33,12 +33,34 @@ fn wrapped_lines_for_display_includes_blank_row_when_empty() {
 
 #[test]
 fn display_rows_after_explicit_newline() {
+    assert_eq!(display_row_count("\n", 48), 2);
+    assert_eq!(wrapped_lines("\n", 48), vec![String::new(), String::new()]);
     assert_eq!(display_row_count("hello\n", 48), 2);
     assert_eq!(display_row_count("a\nb", 48), 2);
     assert_eq!(
         display_row_count("hello\n", 48),
         wrapped_lines_for_display("hello\n", 48).len()
     );
+}
+
+#[test]
+fn newline_after_full_wrapped_line_adds_one_row() {
+    assert_eq!(wrapped_lines("abc", 3), vec!["abc"]);
+    assert_eq!(wrapped_lines("abc\n", 3), vec!["abc", ""]);
+    assert_eq!(display_row_count("abc\n", 3), 2);
+}
+
+#[test]
+fn cursor_visible_after_newline_on_full_wrapped_line() {
+    assert_eq!(cursor_display_position("abc\n", 4, 3), (1, 0));
+    assert_eq!(cursor_display_position("abc\n", 3, 3), (0, 3));
+    assert_eq!(cursor_display_position("abc", 3, 3), (0, 3));
+}
+
+#[test]
+fn cursor_at_right_edge_when_visual_line_is_full() {
+    assert_eq!(cursor_display_position("abc", 3, 3), (0, 3));
+    assert_eq!(cursor_display_position("abcdef", 3, 3), (1, 0));
 }
 
 #[test]

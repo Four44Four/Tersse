@@ -600,7 +600,8 @@ impl RuntimeUi {
             max_y,
             width as i32,
         );
-        if col as i32 >= max_cols {
+        // `col == width` is the caret past the last character on a full visual row.
+        if col as i32 > max_cols {
             let _ = curs_set(0);
             return;
         }

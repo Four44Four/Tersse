@@ -52,6 +52,10 @@
     - Move all lines below current line of text cursor down by 1
        - Increase height of text input by 1
     - Move all text in current line to start of next line
+ - When the text is only a lone newline character:
+    - Display two lines (empty line before the break and empty caret line after)
+ - When a newline is inserted at the end of a line that already fills the element width:
+    - Add exactly one new visual line (the newline has no width; do not add an extra row from hard wrap)
  - When a newline character is selected:
     - Draw visual selection indicator from the position of the newline character to the end of the current line
  - When text is inserted or pasted into the element:
